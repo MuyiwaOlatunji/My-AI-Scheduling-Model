@@ -34,3 +34,6 @@ print(appointments.isnull().sum())
 # Basic statistics
 print("\nBasic Statistics:")
 print(appointments.describe())
+
+from app import query_db
+print(query_db("PRAGMA table_info(appointments)"))
