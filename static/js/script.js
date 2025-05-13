@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
+    // Booking form functionality
     const hospitalSelect = document.getElementById('hospital');
     const departmentSelect = document.getElementById('department');
     const doctorSelect = document.getElementById('doctor');
@@ -7,6 +8,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const slotAvailabilityDiv = document.getElementById('slotAvailability');
     const submitBtn = document.getElementById('submitBtn');
     const loadingSpinner = document.getElementById('loadingSpinner');
+
+    // Flash message auto-dismiss (8 seconds)
+    const flashMessages = document.querySelectorAll('.alert');
+    flashMessages.forEach(message => {
+        setTimeout(() => {
+            message.style.transition = 'opacity 0.5s';
+            message.style.opacity = '0';
+            setTimeout(() => message.remove(), 500);
+        }, 8000); // 8 seconds
+    });
 
     function resetDependentDropdowns() {
         departmentSelect.innerHTML = '<option value="" disabled selected>Pick a hospital first</option>';
@@ -163,18 +174,22 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Update date validation to align with app.py (current date to one year ahead)
     dateInput.addEventListener('change', function () {
         const selectedDate = new Date(this.value);
-        const minDate = new Date('2025-05-09');
-        const maxDate = new Date('2026-05-09');
+        const currentDate = new Date();
+        const maxDate = new Date();
+        maxDate.setFullYear(currentDate.getFullYear() + 1);
 
-        if (selectedDate < minDate || selectedDate > maxDate) {
-            alert('Please select a date between 2025-05-09 and 2026-05-09.');
+        if (selectedDate < currentDate || selectedDate > maxDate) {
+            alert(`Please select a date between ${currentDate.toISOString().split('T')[0]} and ${maxDate.toISOString().split('T')[0]}.`);
             this.value = '';
             timeSelect.innerHTML = '<option value="" disabled selected>Select a date first</option>';
             timeSelect.disabled = true;
             slotAvailabilityDiv.textContent = '';
             submitBtn.disabled = true;
+        } else {
+            loadAvailableSlots();
         }
     });
 
@@ -183,17 +198,19 @@ document.addEventListener('DOMContentLoaded', function () {
             alert('Please select a time slot.');
             slotAvailabilityDiv.textContent = '';
             submitBtn.disabled = true;
+        } else {
+            checkSlotAvailability();
         }
     });
 
-    hospitalSelect.addEventListener('change', loadDepartments);
-    departmentSelect.addEventListener('change', loadDoctors);
-    doctorSelect.addEventListener('change', loadAvailableSlots);
-    dateInput.addEventListener('change', loadAvailableSlots);
-    timeSelect.addEventListener('change', checkSlotAvailability);
-});
+    // Event listeners for booking form
+    if (hospitalSelect) hospitalSelect.addEventListener('change', loadDepartments);
+    if (departmentSelect) departmentSelect.addEventListener('change', loadDoctors);
+    if (doctorSelect) doctorSelect.addEventListener('change', loadAvailableSlots);
+    if (dateInput) dateInput.addEventListener('change', loadAvailableSlots);
+    if (timeSelect) timeSelect.addEventListener('change', checkSlotAvailability);
 
-document.addEventListener('DOMContentLoaded', function () {
+    // Auto-reschedule button functionality
     document.querySelectorAll('.auto-reschedule-btn').forEach(button => {
         button.addEventListener('click', function(e) {
             e.preventDefault();
@@ -223,5 +240,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             }
         });
+    });
+
+    // Ensure action buttons are disabled for attended/closed appointments
+    document.querySelectorAll('.action-btn').forEach(button => {
+        const status = button.getAttribute('data-status');
+        if (status === 'attended' || status === 'closed') {
+            button.disabled = true;
+            button.classList.add('disabled-btn');
+        }
     });
 });

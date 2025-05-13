@@ -210,6 +210,16 @@ p {
     color: #1e40af;
 }
 
+/* Auto-dismiss Alerts */
+.alert.auto-dismiss {
+    opacity: 1;
+    transition: opacity 0.5s ease;
+}
+
+.alert.auto-dismiss.fade-out {
+    opacity: 0;
+}
+
 /* Tables */
 .table {
     background-color: #ffffff;
@@ -304,19 +314,4 @@ p a:hover {
     }
 }
 
-/* Accessibility */
-:focus {
-    outline: 3px solid #3b82f6;
-    outline-offset: 3px;
-}
-
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    border: 0;
-}
+/*
