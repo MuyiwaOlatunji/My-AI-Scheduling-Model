@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', function () {
-    // Booking form functionality
     const hospitalSelect = document.getElementById('hospital');
     const departmentSelect = document.getElementById('department');
     const doctorSelect = document.getElementById('doctor');
@@ -9,39 +8,42 @@ document.addEventListener('DOMContentLoaded', function () {
     const submitBtn = document.getElementById('submitBtn');
     const loadingSpinner = document.getElementById('loadingSpinner');
 
-    // Flash message auto-dismiss (8 seconds)
-    const flashMessages = document.querySelectorAll('.alert');
-    flashMessages.forEach(message => {
-        setTimeout(() => {
-            message.style.transition = 'opacity 0.5s';
-            message.style.opacity = '0';
-            setTimeout(() => message.remove(), 500);
-        }, 8000); // 8 seconds
-    });
+    console.log('hospitalSelect element:', hospitalSelect);
+    console.log('departmentSelect element:', departmentSelect);
+
+    if (hospitalSelect) {
+        console.log('Attaching change event listener to hospitalSelect');
+        hospitalSelect.addEventListener('change', loadDepartments);
+    } else {
+        console.error('hospitalSelect not found in DOM');
+    }
 
     function resetDependentDropdowns() {
-        departmentSelect.innerHTML = '<option value="" disabled selected>Pick a hospital first</option>';
+        console.log('Resetting dependent dropdowns');
+        departmentSelect.innerHTML = '<option value="" disabled selected>Select a department</option>';
         departmentSelect.disabled = true;
-        doctorSelect.innerHTML = '<option value="" disabled selected>Pick a department first</option>';
+        doctorSelect.innerHTML = '<option value="" disabled selected>Select a doctor</option>';
         doctorSelect.disabled = true;
         timeSelect.innerHTML = '<option value="" disabled selected>Select a date first</option>';
         timeSelect.disabled = true;
-        slotAvailabilityDiv.textContent = '';
-        submitBtn.disabled = true;
     }
 
     async function loadDepartments() {
         const hospitalId = hospitalSelect.value;
+        console.log('loadDepartments called with hospitalId:', hospitalId);
         resetDependentDropdowns();
-
         if (hospitalId) {
+            console.log('Fetching departments for hospitalId:', hospitalId);
             departmentSelect.innerHTML = '<option value="" disabled selected>Loading departments...</option>';
             try {
                 const response = await fetch(`/get_departments/${hospitalId}`);
-                if (!response.ok) throw new Error('Network response was not ok');
+                console.log('Fetch response status:', response.status);
+                if (!response.ok) throw new Error(`Network response was not ok: ${response.status}`);
                 const data = await response.json();
+                console.log('Departments data:', data);
                 departmentSelect.innerHTML = '<option value="" disabled selected>Select a department</option>';
-                if (data.length === 0) {
+                if (!data || data.length === 0) {
+                    console.log('No departments found for hospitalId:', hospitalId);
                     departmentSelect.innerHTML = '<option value="" disabled selected>No departments available</option>';
                 } else {
                     data.forEach(dept => {
@@ -51,11 +53,14 @@ document.addEventListener('DOMContentLoaded', function () {
                         departmentSelect.appendChild(option);
                     });
                     departmentSelect.disabled = false;
+                    console.log('Department dropdown enabled with', data.length, 'options');
                 }
             } catch (error) {
                 console.error('Error fetching departments:', error);
                 departmentSelect.innerHTML = '<option value="" disabled selected>Error loading departments</option>';
             }
+        } else {
+            console.log('No hospitalId selected');
         }
     }
 
@@ -174,12 +179,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Update date validation to align with app.py (current date to one year ahead)
+    // Dynamic date validation
     dateInput.addEventListener('change', function () {
         const selectedDate = new Date(this.value);
         const currentDate = new Date();
-        const maxDate = new Date();
-        maxDate.setFullYear(currentDate.getFullYear() + 1);
+        const maxDate = new Date(currentDate);
+        maxDate.setFullYear(maxDate.getFullYear() + 1);
 
         if (selectedDate < currentDate || selectedDate > maxDate) {
             alert(`Please select a date between ${currentDate.toISOString().split('T')[0]} and ${maxDate.toISOString().split('T')[0]}.`);
@@ -203,7 +208,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Event listeners for booking form
+    // Event listeners
     if (hospitalSelect) hospitalSelect.addEventListener('change', loadDepartments);
     if (departmentSelect) departmentSelect.addEventListener('change', loadDoctors);
     if (doctorSelect) doctorSelect.addEventListener('change', loadAvailableSlots);
@@ -242,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Ensure action buttons are disabled for attended/closed appointments
+    // Disable action buttons for attended/closed appointments
     document.querySelectorAll('.action-btn').forEach(button => {
         const status = button.getAttribute('data-status');
         if (status === 'attended' || status === 'closed') {

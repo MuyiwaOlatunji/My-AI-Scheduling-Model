@@ -34,11 +34,15 @@ logging.basicConfig(level=logging.INFO)
 app.logger.setLevel(logging.INFO)
 
 # Authentication decorator
-def login_required(role):
+def login_required(role=None):
     def wrapper(fn):
         @wraps(fn)
         def decorated_view(*args, **kwargs):
-            if 'user_id' not in session or session.get('role') != role:
+            app.logger.debug(f"Login required check: user_id={session.get('user_id')}, role={session.get('role')}, required_role={role}")
+            if not session.get('user_id'):
+                flash("Please log in to access this page.", "danger")
+                return redirect(url_for('login'))
+            if role and session.get('role') != role:
                 flash(f"Please log in as a {role} to view this page.", "danger")
                 return redirect(url_for('login'))
             return fn(*args, **kwargs)
@@ -82,7 +86,7 @@ def init_db():
             c.execute('''CREATE TABLE IF NOT EXISTS users 
                          (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT UNIQUE, phone TEXT, password TEXT, role TEXT)''')
             c.execute('''CREATE TABLE IF NOT EXISTS hospitals 
-                         (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, location TEXT)''')
+                         (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, location TEXT UNIQUE)''')
             c.execute('''CREATE TABLE IF NOT EXISTS departments 
                          (id INTEGER PRIMARY KEY AUTOINCREMENT, hospital_id INTEGER, name TEXT,
                           FOREIGN KEY (hospital_id) REFERENCES hospitals(id))''')
@@ -98,7 +102,13 @@ def init_db():
                           FOREIGN KEY (department_id) REFERENCES departments(id),
                           FOREIGN KEY (doctor_id) REFERENCES doctors(id))''')
 
-            # Seed hospitals, departments, and doctors
+            # Clear existing data to avoid duplicates
+            c.execute("DELETE FROM hospitals")
+            c.execute("DELETE FROM departments")
+            c.execute("DELETE FROM doctors")
+            c.execute("DELETE FROM appointments")
+
+            # Seed hospitals with unique locations
             hospitals = [
                 ("Lagos General Hospital", "Lagos"),
                 ("Abuja Medical Center", "Abuja"),
@@ -111,55 +121,44 @@ def init_db():
                 ("Jos University Teaching Hospital", "Jos"),
                 ("Calabar Specialist Clinic", "Calabar")
             ]
+            c.executemany("INSERT INTO hospitals (name, location) VALUES (?, ?) ON CONFLICT(location) DO NOTHING", hospitals)
+            conn.commit()
+            hospital_ids = [row['id'] for row in c.execute("SELECT id FROM hospitals").fetchall()]
 
+            # Seed departments
             department_names = ["Cardiology", "Pediatrics", "Orthopedics", "Neurology", "General Medicine", 
                                "Gynecology", "Surgery", "Oncology", "Dermatology", "Radiology"]
-            departments = []
-            doctors = []
+            for hospital_id in hospital_ids:
+                for i in range(4):
+                    dept_name = department_names[i % len(department_names)]
+                    c.execute("INSERT INTO departments (hospital_id, name) VALUES (?, ?)", (hospital_id, dept_name))
+            conn.commit()
 
             # Seed a default admin user
             admin_email = "admin@example.com"
             admin_password = generate_password_hash("adminpassword", method='pbkdf2:sha256')
             c.execute("INSERT OR IGNORE INTO users (name, email, phone, password, role) VALUES (?, ?, ?, ?, ?)",
                      ("Admin User", admin_email, "1234567890", admin_password, "admin"))
-
-            # Insert hospitals and get their IDs
-            c.executemany("INSERT OR IGNORE INTO hospitals (name, location) VALUES (?, ?)", hospitals)
             conn.commit()
-            hospital_ids = [row['id'] for row in c.execute("SELECT id FROM hospitals").fetchall()]
 
-            # Seed departments
-            dept_id = 1
-            for hospital_id in hospital_ids:
-                num_depts = 4
-                for i in range(num_depts):
-                    dept_name = department_names[(hospital_id + i - 1) % len(department_names)]
-                    c.execute("INSERT OR IGNORE INTO departments (id, hospital_id, name) VALUES (?, ?, ?)", 
-                             (dept_id, hospital_id, dept_name))
-                    departments.append((dept_id, hospital_id, dept_name))
-                    dept_id += 1
-
+            # Seed doctors (simplified for 3 per department)
             doctor_names = [
                 "Dr. John Adebayo", "Dr. Aisha Bello", "Dr. Emeka Okon", "Dr. Fatima Musa", "Dr. Chioma Obi", 
                 "Dr. Tunde Ade", "Dr. Grace Eke", "Dr. Musa Ibrahim", "Dr. Ngozi Eze", "Dr. Ahmed Yusuf",
-                "Dr. Blessing Nwosu", "Dr. Kemi Adesina", "Dr. David Okafor", "Dr. Zainab Lawal", "Dr. Peter Uche",
-                "Dr. Joy Amadi", "Dr. Sani Abubakar", "Dr. Esther Ojo", "Dr. Chukwuma Eze", "Dr. Halima Danjuma"
+                "Dr. Blessing Nwosu", "Dr. Kemi Adesina", "Dr. David Okafor", "Dr. Zainab Lawal", "Dr. Peter Uche"
             ]
-            
-            # Seed doctors
             doc_id = 1
-            for dept in departments:
+            for dept in c.execute("SELECT id, hospital_id FROM departments").fetchall():
                 dept_id = dept[0]
                 hospital_id = dept[1]
-                for i in range(3):
-                    doc_name = doctor_names[(doc_id - 1) % len(doctor_names)] + f" {doc_id}"
-                    c.execute("INSERT OR IGNORE INTO doctors (id, hospital_id, department_id, name) VALUES (?, ?, ?, ?)",
-                             (doc_id, hospital_id, dept_id, doc_name))
-                    doctors.append((doc_id, hospital_id, dept_id, doc_name))
+                for _ in range(3):
+                    doc_name = doctor_names[(doc_id - 1) % len(doctor_names)]
+                    c.execute("INSERT INTO doctors (hospital_id, department_id, name) VALUES (?, ?, ?)",
+                             (hospital_id, dept_id, doc_name))
                     doc_id += 1
-
             conn.commit()
-            app.logger.info("SQLite database initialized and seeded successfully")
+
+            app.logger.info("SQLite database initialized and seeded successfully with 10 hospitals, 40 departments, and 120 doctors")
         except sqlite3.Error as e:
             app.logger.error(f"Failed to initialize SQLite database: {e}")
             raise
@@ -172,7 +171,7 @@ def init_db():
                 c.execute('''CREATE TABLE IF NOT EXISTS users 
                              (id SERIAL PRIMARY KEY, name TEXT, email TEXT UNIQUE, phone TEXT, password TEXT, role TEXT)''')
                 c.execute('''CREATE TABLE IF NOT EXISTS hospitals 
-                             (id SERIAL PRIMARY KEY, name TEXT, location TEXT)''')
+                             (id SERIAL PRIMARY KEY, name TEXT, location TEXT UNIQUE)''')
                 c.execute('''CREATE TABLE IF NOT EXISTS departments 
                              (id SERIAL PRIMARY KEY, hospital_id INTEGER, name TEXT,
                               FOREIGN KEY (hospital_id) REFERENCES hospitals(id))''')
@@ -188,6 +187,13 @@ def init_db():
                               FOREIGN KEY (department_id) REFERENCES departments(id),
                               FOREIGN KEY (doctor_id) REFERENCES doctors(id))''')
 
+                # Clear existing data
+                c.execute("DELETE FROM hospitals")
+                c.execute("DELETE FROM departments")
+                c.execute("DELETE FROM doctors")
+                c.execute("DELETE FROM appointments")
+
+                # Seed hospitals
                 hospitals = [
                     ("Lagos General Hospital", "Lagos"),
                     ("Abuja Medical Center", "Abuja"),
@@ -200,43 +206,45 @@ def init_db():
                     ("Jos University Teaching Hospital", "Jos"),
                     ("Calabar Specialist Clinic", "Calabar")
                 ]
+                for h in hospitals:
+                    c.execute("INSERT INTO hospitals (name, location) VALUES (%s, %s) ON CONFLICT(location) DO NOTHING RETURNING id", h)
+                conn.commit()
+                hospital_ids = [row[0] for row in c.execute("SELECT id FROM hospitals").fetchall()]
 
+                # Seed departments
                 department_names = ["Cardiology", "Pediatrics", "Orthopedics", "Neurology", "General Medicine", 
                                    "Gynecology", "Surgery", "Oncology", "Dermatology", "Radiology"]
-                departments = []
-                
-                doctor_names = [
-                    "Dr. John Adebayo", "Dr. Aisha Bello", "Dr. Emeka Okon", "Dr. Fatima Musa", "Dr. Chioma Obi", 
-                    "Dr. Tunde Ade", "Dr. Grace Eke", "Dr. Musa Ibrahim", "Dr. Ngozi Eze", "Dr. Ahmed Yusuf",
-                    "Dr. Blessing Nwosu", "Dr. Kemi Adesina", "Dr. David Okafor", "Dr. Zainab Lawal", "Dr. Peter Uche",
-                    "Dr. Joy Amadi", "Dr. Sani Abubakar", "Dr. Esther Ojo", "Dr. Chukwuma Eze", "Dr. Halima Danjuma"
-                ]
-                
+                for hospital_id in hospital_ids:
+                    for i in range(4):
+                        dept_name = department_names[i % len(department_names)]
+                        c.execute("INSERT INTO departments (hospital_id, name) VALUES (%s, %s) ON CONFLICT DO NOTHING", (hospital_id, dept_name))
+                conn.commit()
+
+                # Seed admin user
                 admin_email = "admin@example.com"
                 admin_password = generate_password_hash("adminpassword", method='pbkdf2:sha256')
                 c.execute("INSERT INTO users (name, email, phone, password, role) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
                          ("Admin User", admin_email, "1234567890", admin_password, "admin"))
-
-                # Insert hospitals and get their IDs
-                for h in hospitals:
-                    c.execute("INSERT INTO hospitals (name, location) VALUES (%s, %s) ON CONFLICT DO NOTHING RETURNING id", h)
-                    hospital_id = c.fetchone()[0] if c.rowcount > 0 else None
-                    if hospital_id:
-                        num_depts = 4
-                        for i in range(num_depts):
-                            dept_name = department_names[(hospital_id + i - 1) % len(department_names)]
-                            c.execute("INSERT INTO departments (hospital_id, name) VALUES (%s, %s) ON CONFLICT DO NOTHING RETURNING id", 
-                                     (hospital_id, dept_name))
-                            dept_id = c.fetchone()[0] if c.rowcount > 0 else None
-                            if dept_id:
-                                departments.append((hospital_id, dept_name))
-                                for j in range(3):
-                                    doc_name = doctor_names[(len(departments) * 3 + j - 1) % len(doctor_names)] + f" {len(departments) * 3 + j}"
-                                    c.execute("INSERT INTO doctors (hospital_id, department_id, name) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
-                                             (hospital_id, dept_id, doc_name))
-
                 conn.commit()
-                app.logger.info("PostgreSQL database initialized and seeded successfully")
+
+                # Seed doctors
+                doctor_names = [
+                    "Dr. John Adebayo", "Dr. Aisha Bello", "Dr. Emeka Okon", "Dr. Fatima Musa", "Dr. Chioma Obi", 
+                    "Dr. Tunde Ade", "Dr. Grace Eke", "Dr. Musa Ibrahim", "Dr. Ngozi Eze", "Dr. Ahmed Yusuf",
+                    "Dr. Blessing Nwosu", "Dr. Kemi Adesina", "Dr. David Okafor", "Dr. Zainab Lawal", "Dr. Peter Uche"
+                ]
+                doc_id = 1
+                for dept in c.execute("SELECT id, hospital_id FROM departments").fetchall():
+                    dept_id = dept[0]
+                    hospital_id = dept[1]
+                    for _ in range(3):
+                        doc_name = doctor_names[(doc_id - 1) % len(doctor_names)]
+                        c.execute("INSERT INTO doctors (hospital_id, department_id, name) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+                                 (hospital_id, dept_id, doc_name))
+                        doc_id += 1
+                conn.commit()
+
+                app.logger.info("PostgreSQL database initialized and seeded successfully with 10 hospitals, 40 departments, and 120 doctors")
         except Exception as e:
             app.logger.error(f"Failed to initialize PostgreSQL database: {e}")
             raise
@@ -510,12 +518,21 @@ def logout():
 
 @app.route('/get_departments/<int:hospital_id>', methods=['GET'], endpoint='get_departments')
 def get_departments(hospital_id):
+    app.logger.info(f"Fetching departments for hospital_id: {hospital_id}")
     query = "SELECT id, name FROM departments WHERE hospital_id = %s" if DB_TYPE == "postgresql" else "SELECT id, name FROM departments WHERE hospital_id = ?"
-    departments = query_db(query, (hospital_id,))
-    return jsonify([(dept['id'], dept['name']) for dept in departments])
+    try:
+        departments = query_db(query, (hospital_id,))
+        if not departments:
+            app.logger.warning(f"No departments found for hospital_id: {hospital_id}")
+        app.logger.info(f"Departments found for hospital_id {hospital_id}: {departments}")
+        return jsonify([(dept['id'], dept['name']) for dept in departments])
+    except Exception as e:
+        app.logger.error(f"Error fetching departments for hospital_id {hospital_id}: {e}")
+        return jsonify({'error': 'Failed to fetch departments'}), 500
 
 @app.route('/get_doctors/<int:department_id>', methods=['GET'], endpoint='get_doctors')
 def get_doctors(department_id):
+    app.logger.info(f"Fetching doctors for department_id: {department_id}")
     query = "SELECT id, name FROM doctors WHERE department_id = %s" if DB_TYPE == "postgresql" else "SELECT id, name FROM doctors WHERE department_id = ?"
     doctors = query_db(query, (department_id,))
     return jsonify([(doc['id'], doc['name']) for doc in doctors])
@@ -523,6 +540,7 @@ def get_doctors(department_id):
 @app.route('/book', methods=['GET', 'POST'], endpoint='book_appointment')
 @login_required('patient')
 def book_appointment():
+    app.logger.debug(f"Accessing book_appointment: user_id={session.get('user_id')}, role={session.get('role')}")
     hospitals = query_db("SELECT * FROM hospitals")
     app.logger.info(f"Fetched hospitals: {hospitals}")
     if not hospitals:
@@ -530,20 +548,24 @@ def book_appointment():
         return redirect(url_for('patient_dashboard'))
     
     if request.method == 'POST':
+        if not session.get('user_id') or session.get('role') != 'patient':
+            app.logger.warning("Unauthorized POST attempt to /book")
+            flash("You must be logged in as a patient to book an appointment.", "danger")
+            return redirect(url_for('login'))
         patient_id = session['user_id']
         hospital_id = request.form.get('hospital')
         department_id = request.form.get('department')
         doctor_id = request.form.get('doctor')
-        date = request.form.get('date')
+        appointment_date_str = request.form.get('date')  # Renamed to avoid shadowing
         slot_time = request.form.get('time')
 
-        if not all([hospital_id, department_id, doctor_id, date, slot_time]):
+        if not all([hospital_id, department_id, doctor_id, appointment_date_str, slot_time]):
             flash("All fields are required.", "danger")
             return redirect(url_for('book_appointment'))
 
         try:
-            appointment_date = pd.to_datetime(date)
-            current_date = pd.to_datetime(date.today())
+            appointment_date = pd.to_datetime(appointment_date_str)  # Parse user input
+            current_date = pd.to_datetime(date.today())  # Use date.today() for current date
             max_date = current_date + relativedelta(years=1)
 
             if appointment_date < current_date:
@@ -558,7 +580,7 @@ def book_appointment():
 
         past_appointments = query_db(
             "SELECT status FROM appointments WHERE patient_id = ? AND date < ?",
-            (patient_id, date)
+            (patient_id, appointment_date_str)  # Use the string for database query
         )
         previous_no_shows = sum(1 for appt in past_appointments if appt['status'] == 'no_show')
 
@@ -587,10 +609,10 @@ def book_appointment():
 
             query = """INSERT INTO appointments (patient_id, hospital_id, department_id, doctor_id, slot_time, date, no_show_prob, reschedule_prob, status) 
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
-            query_db(query, (patient_id, hospital_id, department_id, doctor_id, slot_time, date, no_show_prob, reschedule_prob, 'scheduled'), commit=True)
+            query_db(query, (patient_id, hospital_id, department_id, doctor_id, slot_time, appointment_date_str, no_show_prob, reschedule_prob, 'scheduled'), commit=True)
 
             user_email = query_db("SELECT email FROM users WHERE id = ?", (patient_id,), one=True)['email']
-            formatted_date = pd.to_datetime(date).strftime("%d %B %Y")
+            formatted_date = appointment_date.strftime("%d %B %Y")  # Use the parsed datetime object
             flash(f"Appointment successfully booked for {user_email} at {hospital_name} on {formatted_date} at {slot_time}.", "success")
             return redirect(url_for('patient_dashboard'))
         except Exception as e:
