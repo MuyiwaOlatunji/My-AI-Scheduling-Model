@@ -76,8 +76,12 @@
                     <td>{{ appt[5] }}</td>
                     <td>{{ appt[6] }}</td>
                     <td>{{ appt[7] }}</td>
-                    <td class="{% if (appt[8] | float) > 75 %}high-risk{% else %}low-risk{% endif %}">{{ appt[8] }}%</td>
-                    <td class="{% if (appt[9] | float) > 75 %}high-risk{% else %}low-risk{% endif %}">{{ appt[9] }}%</td>
+                    <td{% if (appt[8] | float | default(0)) > 75 %} class="high-risk"{% elif (appt[8] | float | default(0)) <= 75 %} class="low-risk"{% endif %} style="color: {% if (appt[8] | float | default(0)) > 75 %}#d12f2f{% else %}#2a6b73{% endif %}">
+                        {{ appt[8] | default('0.00') }}%
+                    </td>
+                    <td{% if (appt[9] | float | default(0)) > 75 %} class="high-risk"{% elif (appt[9] | float | default(0)) <= 75 %} class="low-risk"{% endif %} style="color: {% if (appt[9] | float | default(0)) > 75 %}#d12f2f{% else %}#2a6b73{% endif %}">
+                        {{ appt[9] | default('0.00') }}%
+                    </td>
                     <td>{{ appt[10] }}</td>
                     <td>
                         {% if appt[10] in ['scheduled', 'rescheduled'] %}

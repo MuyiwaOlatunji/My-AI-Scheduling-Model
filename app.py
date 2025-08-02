@@ -471,8 +471,8 @@ def admin_dashboard():
         [
             appt['id'], appt['name'], appt['email'], appt['hospital_name'], appt['department_name'],
             appt['doctor_name'], appt['slot_time'], appt['date'],
-            f"{float(appt['no_show_prob']):.2f}" if appt['no_show_prob'] is not None else "0.00",
-            f"{float(appt['reschedule_prob']):.2f}" if appt['reschedule_prob'] is not None else "0.00",
+            f"{float(appt['no_show_prob']) if appt['no_show_prob'] is not None else 0.0:.2f}",
+            f"{float(appt['reschedule_prob']) if appt['reschedule_prob'] is not None else 0.0:.2f}",
             appt['status']
         ]
         for appt in appointments

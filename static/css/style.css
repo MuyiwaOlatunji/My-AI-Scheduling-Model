@@ -9,7 +9,7 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     line-height: 1.7;
     color: #4A2C2A; /* Warm dark brown text */
-    background-color: #FFF5E1; /* Softer cream background */
+    background-color: #FFF8E8; /* Warmer cream background */
     min-height: 100vh;
 }
 
@@ -25,10 +25,10 @@ p { margin-bottom: 1.25rem; font-size: 1.05rem; }
 
 /* Navigation Bar */
 .navbar {
-    background-color: #FFF5E1; /* Softer cream */
+    background: linear-gradient(to bottom, #FFF8E8, #FFEFD5); /* Warmer cream gradient */
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     padding: 1.25rem 0;
-    border-bottom: 1px solid #FFB300; /* Amber border */
+    border-bottom: 2px solid #FFB300; /* Thicker amber border */
 }
 .navbar-brand {
     font-size: 1.75rem;
@@ -59,6 +59,8 @@ p { margin-bottom: 1.25rem; font-size: 1.05rem; }
     max-width: 1280px;
     margin: 3rem auto;
     padding: 0 2rem;
+    background-color: #FFF8E8; /* Warmer cream */
+    border-radius: 10px;
 }
 
 /* Buttons */
@@ -76,9 +78,9 @@ p { margin-bottom: 1.25rem; font-size: 1.05rem; }
     color: #ffffff;
 }
 .btn-primary:hover {
-    background-color: #D84315; /* Deep orange */
+    background-color: #C63915; /* Darker coral */
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(255, 111, 97, 0.3);
+    box-shadow: 0 4px 12px rgba(255, 111, 97, 0.4);
 }
 .btn-primary:disabled {
     background-color: #a0aec0;
@@ -91,9 +93,9 @@ p { margin-bottom: 1.25rem; font-size: 1.05rem; }
     color: #ffffff;
 }
 .btn-secondary:hover {
-    background-color: #6B3A0F;
+    background-color: #5B2F0B; /* Darker brown */
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 .btn-success {
     background-color: #10b981;
@@ -102,25 +104,25 @@ p { margin-bottom: 1.25rem; font-size: 1.05rem; }
 .btn-success:hover {
     background-color: #059669;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 .btn-danger {
-    background-color: #ef4444;
+    background-color: #d12f2f; /* Warmer red */
     color: #ffffff;
 }
 .btn-danger:hover {
-    background-color: #dc2626;
+    background-color: #a12323; /* Darker warm red */
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    box-shadow: 0 4px 12px rgba(209, 47, 47, 0.4);
 }
 .btn-warning {
     background-color: #FFB300; /* Amber */
     color: #1a202c;
 }
 .btn-warning:hover {
-    background-color: #D97706;
+    background-color: #D97706; /* Darker amber */
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
 }
 
 /* Forms */
@@ -131,7 +133,7 @@ p { margin-bottom: 1.25rem; font-size: 1.05rem; }
     max-width: 500px;
     margin: 0 auto;
     padding: 2rem;
-    background-color: #ffffff;
+    background-color: #FFF8E8; /* Warmer cream */
     border-radius: 10px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
@@ -148,13 +150,13 @@ p { margin-bottom: 1.25rem; font-size: 1.05rem; }
     padding: 0.875rem;
     font-size: 1.05rem;
     transition: all 0.3s ease;
-    background-color: #ffffff;
+    background-color: #FFF8E8; /* Warmer cream */
     color: #4A2C2A;
     width: 100%;
 }
 .form-control:focus, .form-select:focus {
     border-color: #FF6F61; /* Warm coral */
-    box-shadow: 0 0 0 4px rgba(255, 111, 97, 0.1);
+    box-shadow: 0 0 0 4px rgba(255, 111, 97, 0.2);
     outline: none;
 }
 .form-group {
@@ -172,31 +174,35 @@ p { margin-bottom: 1.25rem; font-size: 1.05rem; }
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 .alert-success {
-    background-color: #ecfdf5;
+    background-color: #e6fff5;
     color: #047857;
 }
 .alert-danger {
-    background-color: #fef2f2;
+    background-color: #ffeded;
     color: #b91c1c;
 }
 .alert-info {
-    background-color: #eff6ff;
+    background-color: #f0f7ff;
     color: #1e40af;
+}
+.alert-warning {
+    background-color: #fff5d1;
+    color: #8a6d3b;
 }
 
 /* Risk Flagging */
-.high-risk {
-    color: #ef4444; /* Red for >75% */
+.table td.high-risk {
+    color: #d12f2f; /* Warmer coral red for >75% */
     font-weight: 600;
 }
-.low-risk {
-    color: #3b82f6; /* Blue for ≤75% */
+.table td.low-risk {
+    color: #2a6b73; /* Warmer teal for ≤75% */
     font-weight: 600;
 }
 
 /* Tables */
 .table {
-    background-color: #ffffff;
+    background-color: #FFF8E8; /* Warmer cream */
     border-radius: 10px;
     overflow: hidden;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
@@ -212,13 +218,13 @@ p { margin-bottom: 1.25rem; font-size: 1.05rem; }
     color: #ffffff;
 }
 .table-striped tbody tr {
-    background-color: #fdfdfd;
+    background-color: #FFF8E8; /* Warmer cream */
 }
 .table-striped tbody tr:nth-of-type(odd) {
-    background-color: #f9fafb;
+    background-color: #FFEFD5; /* Slightly darker cream */
 }
 .table-hover tbody tr:hover {
-    background-color: #FFF5E1; /* Softer cream */
+    background-color: #FFF0E0; /* Even warmer cream on hover */
 }
 
 /* Slot Availability */
@@ -228,7 +234,7 @@ p { margin-bottom: 1.25rem; font-size: 1.05rem; }
     font-size: 1.05rem;
 }
 .slot-unavailable, .error-message {
-    color: #ef4444;
+    color: #d12f2f; /* Warmer red */
     font-weight: 600;
     font-size: 1.05rem;
 }
@@ -248,7 +254,7 @@ p a {
     transition: color 0.3s ease;
 }
 p a:hover {
-    color: #D84315; /* Deep orange */
+    color: #C63915; /* Darker coral */
     text-decoration: underline;
 }
 
@@ -294,17 +300,17 @@ p a:hover {
     border-radius: 4px;
 }
 .alert-success {
-    background-color: #dff0d8;
-    border-color: #d6e9c6;
-    color: #3c763d;
+    background-color: #e6fff5;
+    border-color: #d1f5e8;
+    color: #047857;
 }
 .alert-danger {
-    background-color: #f2dede;
-    border-color: #ebccd1;
-    color: #a94442;
+    background-color: #ffeded;
+    border-color: #f8d7d7;
+    color: #b91c1c;
 }
 .alert-warning {
-    background-color: #fcf8e3;
-    border-color: #faebcc;
+    background-color: #fff5d1;
+    border-color: #ffefbd;
     color: #8a6d3b;
 }

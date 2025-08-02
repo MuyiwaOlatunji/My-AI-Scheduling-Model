@@ -32,7 +32,7 @@
                     </li>
                     {% else %}
                     <li class="nav-item">
-                        <a class13="nav-link {% if request.endpoint == 'login' %}active{% endif %}" href="{{ url_for('login') }}">Login</a>
+                        <a class="nav-link {% if request.endpoint == 'login' %}active{% endif %}" href="{{ url_for('login') }}">Login</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'register' %}active{% endif %}" href="{{ url_for('register') }}">Register</a>
@@ -45,7 +45,7 @@
 
     <div class="container text-center">
         <h1>Welcome to the Patient Appointment System</h1>
-        <p class="lead">Book and manage your medical appointments with ease.</p>
+        <p class="lead" style="color: #4A2C2A;">Book and manage your medical appointments with ease.</p>
         <div class="mt-4">
             <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">Login</a>
             <a href="{{ url_for('register') }}" class="btn btn-secondary btn-lg">Register</a>
