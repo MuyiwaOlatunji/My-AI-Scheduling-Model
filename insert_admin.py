@@ -14,4 +14,3 @@ except sqlite3.Error as e:
     print(f"Error inserting admin user: {e}")
 finally:
     conn.close()
-    

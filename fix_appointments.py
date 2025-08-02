@@ -1,5 +1,5 @@
 from app import query_db, app
-from model.no_show_model import predict_no_show, predict_reschedule
+from model.panrpm_model import predict_no_show, predict_reschedule
 from datetime import datetime
 import pandas as pd
 

@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
+    // Booking Form Functions
     const hospitalSelect = document.getElementById('hospital');
     const departmentSelect = document.getElementById('department');
     const doctorSelect = document.getElementById('doctor');
@@ -8,136 +9,103 @@ document.addEventListener('DOMContentLoaded', function () {
     const submitBtn = document.getElementById('submitBtn');
     const loadingSpinner = document.getElementById('loadingSpinner');
 
-    console.log('hospitalSelect element:', hospitalSelect);
-    console.log('departmentSelect element:', departmentSelect);
-
     if (hospitalSelect) {
-        console.log('Attaching change event listener to hospitalSelect');
         hospitalSelect.addEventListener('change', loadDepartments);
-    } else {
-        console.error('hospitalSelect not found in DOM');
     }
-
-    function resetDependentDropdowns() {
-        console.log('Resetting dependent dropdowns');
-        departmentSelect.innerHTML = '<option value="" disabled selected>Select a department</option>';
-        departmentSelect.disabled = true;
-        doctorSelect.innerHTML = '<option value="" disabled selected>Select a doctor</option>';
-        doctorSelect.disabled = true;
-        timeSelect.innerHTML = '<option value="" disabled selected>Select a date first</option>';
-        timeSelect.disabled = true;
+    if (departmentSelect) {
+        departmentSelect.addEventListener('change', loadDoctors);
+    }
+    if (doctorSelect) {
+        doctorSelect.addEventListener('change', loadAvailableSlots);
+    }
+ if (dateInput) {
+        dateInput.addEventListener('change', function () {
+            const selectedDate = new Date(this.value);
+            const currentDate = new Date();
+            const maxDate = new Date(currentDate.setFullYear(currentDate.getFullYear() + 1));
+            currentDate.setDate(currentDate.getDate() - currentDate.getFullYear() - 1); // Reset to today
+            if (selectedDate < currentDate || selectedDate > maxDate) {
+                alert(`Please select a date between ${currentDate.toISOString().split('T')[0]} and ${maxDate.toISOString().split('T')[0]}.`);
+                this.value = '';
+                resetTimeSelect();
+            } else {
+                loadAvailableSlots();
+            }
+        });
+    }
+    if (timeSelect) {
+        timeSelect.addEventListener('change', checkSlotAvailability);
     }
 
     async function loadDepartments() {
         const hospitalId = hospitalSelect.value;
-        console.log('loadDepartments called with hospitalId:', hospitalId);
         resetDependentDropdowns();
-        if (hospitalId) {
-            console.log('Fetching departments for hospitalId:', hospitalId);
-            departmentSelect.innerHTML = '<option value="" disabled selected>Loading departments...</option>';
-            try {
-                const response = await fetch(`/get_departments/${hospitalId}`);
-                console.log('Fetch response status:', response.status);
-                if (!response.ok) throw new Error(`Network response was not ok: ${response.status}`);
-                const data = await response.json();
-                console.log('Departments data:', data);
-                departmentSelect.innerHTML = '<option value="" disabled selected>Select a department</option>';
-                if (!data || data.length === 0) {
-                    console.log('No departments found for hospitalId:', hospitalId);
-                    departmentSelect.innerHTML = '<option value="" disabled selected>No departments available</option>';
-                } else {
-                    data.forEach(dept => {
-                        const option = document.createElement('option');
-                        option.value = dept[0];
-                        option.textContent = dept[1];
-                        departmentSelect.appendChild(option);
-                    });
-                    departmentSelect.disabled = false;
-                    console.log('Department dropdown enabled with', data.length, 'options');
-                }
-            } catch (error) {
-                console.error('Error fetching departments:', error);
-                departmentSelect.innerHTML = '<option value="" disabled selected>Error loading departments</option>';
-            }
-        } else {
-            console.log('No hospitalId selected');
+        if (!hospitalId) return;
+        departmentSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
+        try {
+            const response = await fetch(`/get_departments/${hospitalId}`);
+            const data = await response.json();
+            departmentSelect.innerHTML = '<option value="" disabled selected>Select a department</option>';
+            data.forEach(dept => {
+                const option = new Option(dept[1], dept[0]);
+                departmentSelect.appendChild(option);
+            });
+            departmentSelect.disabled = false;
+        } catch (error) {
+            departmentSelect.innerHTML = '<option value="" disabled selected>Error loading</option>';
+            console.error('Error:', error);
         }
     }
 
     async function loadDoctors() {
         const departmentId = departmentSelect.value;
-        doctorSelect.innerHTML = '<option value="" disabled selected>Loading doctors...</option>';
-        doctorSelect.disabled = true;
-        timeSelect.innerHTML = '<option value="" disabled selected>Select a date first</option>';
-        timeSelect.disabled = true;
-        slotAvailabilityDiv.textContent = '';
-        submitBtn.disabled = true;
-
-        if (departmentId) {
-            try {
-                const response = await fetch(`/get_doctors/${departmentId}`);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const data = await response.json();
-                doctorSelect.innerHTML = '<option value="" disabled selected>Select a doctor</option>';
-                if (data.length === 0) {
-                    doctorSelect.innerHTML = '<option value="" disabled selected>No doctors available</option>';
-                } else {
-                    data.forEach(doc => {
-                        const option = document.createElement('option');
-                        option.value = doc[0];
-                        option.textContent = doc[1];
-                        doctorSelect.appendChild(option);
-                    });
-                    doctorSelect.disabled = false;
-                }
-            } catch (error) {
-                console.error('Error fetching doctors:', error);
-                doctorSelect.innerHTML = '<option value="" disabled selected>Error loading doctors</option>';
-            }
+        if (!departmentId) return;
+        doctorSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
+        try {
+            const response = await fetch(`/get_doctors/${departmentId}`);
+            const data = await response.json();
+            doctorSelect.innerHTML = '<option value="" disabled selected>Select a doctor</option>';
+            data.forEach(doc => {
+                const option = new Option(doc[1], doc[0]);
+                doctorSelect.appendChild(option);
+            });
+            doctorSelect.disabled = false;
+        } catch (error) {
+            doctorSelect.innerHTML = '<option value="" disabled selected>Error loading</option>';
+            console.error('Error:', error);
         }
     }
 
     async function loadAvailableSlots() {
         const doctorId = doctorSelect.value;
         const date = dateInput.value;
-
-        timeSelect.innerHTML = '<option value="" disabled selected>Loading available slots...</option>';
+        if (!doctorId || !date) return;
+        timeSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
         timeSelect.disabled = true;
         slotAvailabilityDiv.textContent = '';
         submitBtn.disabled = true;
         loadingSpinner.style.display = 'block';
-
-        if (doctorId && date) {
-            try {
-                const response = await fetch(`/get_available_slots?doctor_id=${doctorId}&date=${date}`);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const data = await response.json();
-                loadingSpinner.style.display = 'none';
-                timeSelect.innerHTML = '<option value="" disabled selected>Select a time</option>';
-                if (data.error) {
-                    timeSelect.innerHTML = '<option value="" disabled selected>Error loading slots</option>';
-                    slotAvailabilityDiv.textContent = data.error;
-                    slotAvailabilityDiv.className = 'error-message';
-                } else if (data.length === 0) {
-                    timeSelect.innerHTML = '<option value="" disabled selected>No available slots</option>';
-                } else {
-                    data.forEach(slot => {
-                        const option = document.createElement('option');
-                        option.value = slot;
-                        option.textContent = slot;
-                        timeSelect.appendChild(option);
-                    });
-                    timeSelect.disabled = false;
-                }
-            } catch (error) {
-                console.error('Error fetching available slots:', error);
-                loadingSpinner.style.display = 'none';
-                timeSelect.innerHTML = '<option value="" disabled selected>Error loading slots</option>';
-                slotAvailabilityDiv.textContent = 'Error loading available slots';
-                slotAvailabilityDiv.className = 'error-message';
-            }
-        } else {
+        try {
+            const response = await fetch(`/get_available_slots?doctor_id=${doctorId}&date=${date}`);
+            const data = await response.json();
             loadingSpinner.style.display = 'none';
+            timeSelect.innerHTML = '<option value="" disabled selected>Select a time</option>';
+            if (data.error) {
+                slotAvailabilityDiv.textContent = data.error;
+                slotAvailabilityDiv.className = 'text-danger';
+            } else if (!data.length) {
+                timeSelect.innerHTML = '<option value="" disabled selected>No slots available</option>';
+            } else {
+                data.forEach(slot => {
+                    const option = new Option(slot, slot);
+                    timeSelect.appendChild(option);
+                });
+                timeSelect.disabled = false;
+            }
+        } catch (error) {
+            loadingSpinner.style.display = 'none';
+            timeSelect.innerHTML = '<option value="" disabled selected>Error loading</option>';
+            console.error('Error:', error);
         }
     }
 
@@ -145,77 +113,75 @@ document.addEventListener('DOMContentLoaded', function () {
         const doctorId = doctorSelect.value;
         const date = dateInput.value;
         const time = timeSelect.value;
-
+        if (!doctorId || !date || !time) return;
         slotAvailabilityDiv.textContent = '';
         submitBtn.disabled = true;
-
-        if (doctorId && date && time) {
-            slotAvailabilityDiv.textContent = 'Checking final availability...';
-            slotAvailabilityDiv.className = '';
-            loadingSpinner.style.display = 'block';
-            try {
-                const response = await fetch(`/check_slot?doctor_id=${doctorId}&date=${date}&time=${encodeURIComponent(time)}`);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const data = await response.json();
-                loadingSpinner.style.display = 'none';
-                if (data.available) {
-                    slotAvailabilityDiv.textContent = 'Slot is available';
-                    slotAvailabilityDiv.className = 'slot-available';
-                    submitBtn.disabled = false;
-                } else {
-                    slotAvailabilityDiv.textContent = data.error || 'Slot is unavailable';
-                    slotAvailabilityDiv.className = 'slot-unavailable';
-                    submitBtn.disabled = true;
-                }
-            } catch (error) {
-                console.error('Error checking slot availability:', error);
-                loadingSpinner.style.display = 'none';
-                slotAvailabilityDiv.textContent = 'Error checking availability';
-                slotAvailabilityDiv.className = 'error-message';
-                submitBtn.disabled = true;
-            }
-        } else {
+        loadingSpinner.style.display = 'block';
+        try {
+            const response = await fetch(`/check_slot?doctor_id=${doctorId}&date=${date}&time=${encodeURIComponent(time)}`);
+            const data = await response.json();
             loadingSpinner.style.display = 'none';
+            slotAvailabilityDiv.textContent = data.available ? 'Slot available' : 'Slot unavailable';
+            slotAvailabilityDiv.className = data.available ? 'text-success' : 'text-danger';
+            submitBtn.disabled = !data.available;
+        } catch (error) {
+            loadingSpinner.style.display = 'none';
+            slotAvailabilityDiv.textContent = 'Error checking slot';
+            slotAvailabilityDiv.className = 'text-danger';
+            console.error('Error:', error);
         }
     }
 
-    // Dynamic date validation
-    dateInput.addEventListener('change', function () {
-        const selectedDate = new Date(this.value);
-        const currentDate = new Date();
-        const maxDate = new Date(currentDate);
-        maxDate.setFullYear(maxDate.getFullYear() + 1);
+    function resetDependentDropdowns() {
+        departmentSelect.innerHTML = '<option value="" disabled selected>Select a department</option>';
+        departmentSelect.disabled = true;
+        doctorSelect.innerHTML = '<option value="" disabled selected>Select a doctor</option>';
+        doctorSelect.disabled = true;
+        resetTimeSelect();
+    }
 
-        if (selectedDate < currentDate || selectedDate > maxDate) {
-            alert(`Please select a date between ${currentDate.toISOString().split('T')[0]} and ${maxDate.toISOString().split('T')[0]}.`);
-            this.value = '';
-            timeSelect.innerHTML = '<option value="" disabled selected>Select a date first</option>';
-            timeSelect.disabled = true;
-            slotAvailabilityDiv.textContent = '';
-            submitBtn.disabled = true;
-        } else {
-            loadAvailableSlots();
-        }
-    });
+    function resetTimeSelect() {
+        timeSelect.innerHTML = '<option value="" disabled selected>Select a date first</option>';
+        timeSelect.disabled = true;
+        slotAvailabilityDiv.textContent = '';
+        submitBtn.disabled = true;
+    }
 
-    timeSelect.addEventListener('change', function () {
-        if (!this.value) {
-            alert('Please select a time slot.');
-            slotAvailabilityDiv.textContent = '';
-            submitBtn.disabled = true;
-        } else {
-            checkSlotAvailability();
-        }
-    });
+    // Hospital Registration Functions
+    window.addDepartment = function() {
+        const departmentsDiv = document.getElementById('departments');
+        const deptCount = parseInt(departmentsDiv.getAttribute('data-dept-count'));
+        const newDeptIndex = deptCount;
+        departmentsDiv.setAttribute('data-dept-count', deptCount + 1);
+        const firstDept = departmentsDiv.querySelector('.department');
+        const newDept = firstDept.cloneNode(true);
+        newDept.setAttribute('data-dept-index', newDeptIndex);
+        newDept.setAttribute('data-doctor-count', 1);
+        newDept.querySelectorAll('input, select').forEach(input => {
+            input.name = input.name.replace(/\[\d+\]/, `[${newDeptIndex}]`);
+            input.value = '';
+        });
+        const doctorsDiv = newDept.querySelector('.doctors');
+        doctorsDiv.innerHTML = '';
+        addDoctor(newDeptIndex);
+        departmentsDiv.appendChild(newDept);
+    };
 
-    // Event listeners
-    if (hospitalSelect) hospitalSelect.addEventListener('change', loadDepartments);
-    if (departmentSelect) departmentSelect.addEventListener('change', loadDoctors);
-    if (doctorSelect) doctorSelect.addEventListener('change', loadAvailableSlots);
-    if (dateInput) dateInput.addEventListener('change', loadAvailableSlots);
-    if (timeSelect) timeSelect.addEventListener('change', checkSlotAvailability);
+    window.addDoctor = function(deptIndex) {
+        const deptDiv = document.querySelector(`.department[data-dept-index="${deptIndex}"]`);
+        const doctorCount = parseInt(deptDiv.getAttribute('data-doctor-count'));
+        const newDoctorIndex = doctorCount;
+        deptDiv.setAttribute('data-doctor-count', doctorCount + 1);
+        const firstDoctor = document.querySelector('.department[data-dept-index="0"] .doctor');
+        const newDoctor = firstDoctor.cloneNode(true);
+        newDoctor.querySelectorAll('input, select').forEach(input => {
+            input.name = input.name.replace(/\[\d+\]\[\d+\]/, `[${deptIndex}][${newDoctorIndex}]`);
+            input.value = '';
+        });
+        deptDiv.querySelector('.doctors').appendChild(newDoctor);
+    };
 
-    // Auto-reschedule button functionality
+    // Admin Dashboard Auto-Reschedule
     document.querySelectorAll('.auto-reschedule-btn').forEach(button => {
         button.addEventListener('click', function(e) {
             e.preventDefault();
@@ -223,36 +189,24 @@ document.addEventListener('DOMContentLoaded', function () {
             if (confirm('Are you sure you want to auto-reschedule this appointment?')) {
                 fetch(`/auto_reschedule/${apptId}`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' }
                 })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok: ' + response.statusText);
-                    }
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
                     alert(data.message);
-                    if (data.status === 'success') {
-                        location.reload();
-                    }
+                    if (data.status === 'success') location.reload();
                 })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('An error occurred while auto-rescheduling: ' + error.message);
-                });
+                .catch(error => alert('Error: ' + error.message));
             }
         });
     });
 
-    // Disable action buttons for attended/closed appointments
-    document.querySelectorAll('.action-btn').forEach(button => {
-        const status = button.getAttribute('data-status');
-        if (status === 'attended' || status === 'closed') {
-            button.disabled = true;
-            button.classList.add('disabled-btn');
-        }
+    // Alert Fading
+    const alerts = document.querySelectorAll('.alert');
+    alerts.forEach(alert => {
+        setTimeout(() => {
+            alert.classList.add('fade');
+            setTimeout(() => alert.remove(), 500);
+        }, 8000);
     });
 });
