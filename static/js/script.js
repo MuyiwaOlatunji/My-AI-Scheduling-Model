@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (doctorSelect) {
         doctorSelect.addEventListener('change', loadAvailableSlots);
     }
- if (dateInput) {
+    if (dateInput) {
         dateInput.addEventListener('change', function () {
             const selectedDate = new Date(this.value);
             const currentDate = new Date();

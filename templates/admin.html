@@ -76,27 +76,29 @@
                     <td>{{ appt[5] }}</td>
                     <td>{{ appt[6] }}</td>
                     <td>{{ appt[7] }}</td>
-                    <td{% if (appt[8] | float | default(0)) > 75 %} class="high-risk"{% elif (appt[8] | float | default(0)) <= 75 %} class="low-risk"{% endif %} style="color: {% if (appt[8] | float | default(0)) > 75 %}#d12f2f{% else %}#2a6b73{% endif %}">
+                    <td{% if (appt[8] | float | default(0)) > 75 %} class="high-risk"{% elif (appt[8] | float | default(0)) <= 50 %} class="low-risk"{% endif %} style="color: {% if (appt[8] | float | default(0)) > 51 %}#d12f2f{% else %}#2a6b73{% endif %}">
                         {{ appt[8] | default('0.00') }}%
                     </td>
-                    <td{% if (appt[9] | float | default(0)) > 75 %} class="high-risk"{% elif (appt[9] | float | default(0)) <= 75 %} class="low-risk"{% endif %} style="color: {% if (appt[9] | float | default(0)) > 75 %}#d12f2f{% else %}#2a6b73{% endif %}">
+                    <td{% if (appt[9] | float | default(0)) > 55 %} class="high-risk"{% elif (appt[9] | float | default(0)) <= 55 %} class="low-risk"{% endif %} style="color: {% if (appt[9] | float | default(0)) > 55 %}#d12f2f{% else %}#2a6b73{% endif %}">
                         {{ appt[9] | default('0.00') }}%
                     </td>
                     <td>{{ appt[10] }}</td>
                     <td>
                         {% if appt[10] in ['scheduled', 'rescheduled'] %}
-                            <form action="{{ url_for('mark_attended', appt_id=appt[0]) }}" method="POST" style="display:inline;">
-                                <button type="submit" class="btn btn-success btn-sm">Mark Attended</button>
-                            </form>
-                            <form action="{{ url_for('reschedule', appt_id=appt[0]) }}" method="POST" style="display:inline;">
-                                <input type="date" name="date" required class="form-control d-inline-block" style="width: auto;">
-                                <input type="text" name="time" placeholder="e.g., 10:00 AM" required class="form-control d-inline-block" style="width: auto;">
-                                <button type="submit" class="btn btn-primary btn-sm">Reschedule</button>
-                            </form>
-                            <button class="btn btn-warning btn-sm auto-reschedule-btn" data-appt-id="{{ appt[0] }}">Auto-Reschedule</button>
-                            <form action="{{ url_for('close_appt', appt_id=appt[0]) }}" method="POST" style="display:inline;">
-                                <button type="submit" class="btn btn-danger btn-sm">Close</button>
-                            </form>
+                            <div class="btn-container">
+                                <form action="{{ url_for('mark_attended', appt_id=appt[0]) }}" method="POST" style="display:inline;">
+                                    <button type="submit" class="btn btn-success btn-sm" title="Mark as Attended">Attended</button>
+                                </form>
+                                <form action="{{ url_for('reschedule', appt_id=appt[0]) }}" method="POST" style="display:inline;">
+                                    <input type="date" name="date" required class="form-control d-inline-block">
+                                    <input type="text" name="time" placeholder="e.g., 10:00 AM" required class="form-control d-inline-block">
+                                    <button type="submit" class="btn btn-primary btn-sm" title="Reschedule Appointment">Reschedule</button>
+                                </form>
+                                <button class="btn btn-warning btn-sm auto-reschedule-btn" data-appt-id="{{ appt[0] }}" title="Auto-Reschedule Appointment">Auto</button>
+                                <form action="{{ url_for('close_appt', appt_id=appt[0]) }}" method="POST" style="display:inline;">
+                                    <button type="submit" class="btn btn-danger btn-sm" title="Close Appointment">Close</button>
+                                </form>
+                            </div>
                         {% else %}
                             <span>No actions available</span>
                         {% endif %}
