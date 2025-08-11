@@ -4,9 +4,11 @@ import random
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import os
+from werkzeug.security import generate_password_hash
+
 try:
     from model.panrpm_model import predict_no_show, predict_reschedule
-except FileNotFoundError:
+except (FileNotFoundError, ImportError):
     # Define dummy functions if models are not available
     def predict_no_show(features):
         return random.uniform(0, 100)  # Placeholder: random probability
@@ -18,19 +20,23 @@ def init_db():
     conn = sqlite3.connect("database.db")
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT UNIQUE, phone TEXT, password TEXT, role TEXT, age INTEGER)''')
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT UNIQUE, phone TEXT, password TEXT, 
+                  role TEXT, age INTEGER, location TEXT, gender TEXT, marriage_status TEXT, occupation TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS hospitals 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, location TEXT UNIQUE)''')
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, location TEXT, subscription_status TEXT, 
+                  subscription_expiry_date TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS departments 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, hospital_id INTEGER, name TEXT,
                   FOREIGN KEY (hospital_id) REFERENCES hospitals(id))''')
     c.execute('''CREATE TABLE IF NOT EXISTS doctors 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, hospital_id INTEGER, department_id INTEGER, name TEXT, schedule TEXT, gender TEXT,
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, hospital_id INTEGER, department_id INTEGER, name TEXT, 
+                  schedule TEXT, gender TEXT,
                   FOREIGN KEY (hospital_id) REFERENCES hospitals(id),
                   FOREIGN KEY (department_id) REFERENCES departments(id))''')
     c.execute('''CREATE TABLE IF NOT EXISTS appointments 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, patient_id INTEGER, hospital_id INTEGER, department_id INTEGER, 
-                  doctor_id INTEGER, slot_time TEXT, date TEXT, booking_date TEXT, no_show_prob REAL, reschedule_prob REAL, status TEXT,
+                  doctor_id INTEGER, slot_time TEXT, date TEXT, booking_date TEXT, no_show_prob REAL, reschedule_prob REAL, 
+                  status TEXT, health_challenge TEXT,
                   FOREIGN KEY (patient_id) REFERENCES users(id),
                   FOREIGN KEY (hospital_id) REFERENCES hospitals(id),
                   FOREIGN KEY (department_id) REFERENCES departments(id),
@@ -46,34 +52,39 @@ def clear_appointments():
     c.execute("DELETE FROM appointments")
     conn.commit()
     conn.close()
+    print("Existing appointments cleared.")
 
 # Seed users
 def seed_users():
     conn = sqlite3.connect("database.db")
     c = conn.cursor()
     users = [
-        ("John Doe", "john@example.com", "08012345678", "password123", "patient", 30),
-        ("Jane Smith", "jane@example.com", "08098765432", "password123", "patient", 25),
-        ("Alice Johnson", "alice@example.com", "08055555555", "password123", "patient", 40),
-        ("Bob Brown", "bob@example.com", "08044444444", "password123", "patient", 35)
+        ("John Doe", "john@example.com", "08012345678", generate_password_hash("password123"), "patient", 30, "Lagos", "M", "Single", "Engineer"),
+        ("Jane Smith", "jane@example.com", "08098765432", generate_password_hash("password123"), "patient", 25, "Abuja", "F", "Married", "Teacher"),
+        ("Alice Johnson", "alice@example.com", "08055555555", generate_password_hash("password123"), "patient", 40, "Lagos", "F", "Divorced", "Doctor"),
+        ("Bob Brown", "bob@example.com", "08044444444", generate_password_hash("password123"), "patient", 35, "Kano", "M", "Widowed", "Lawyer"),
+        ("Admin User", "admin@example.com", "08011111111", generate_password_hash("adminpassword"), "super_admin", 50, "Lagos", "M", "Married", "Administrator"),
     ]
-    c.executemany("INSERT OR IGNORE INTO users (name, email, phone, password, role, age) VALUES (?, ?, ?, ?, ?, ?)", users)
+    c.executemany("INSERT OR IGNORE INTO users (name, email, phone, password, role, age, location, gender, marriage_status, occupation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", users)
     conn.commit()
     conn.close()
+    print("Users seeded.")
 
 # Seed hospitals
 def seed_hospitals():
     conn = sqlite3.connect("database.db")
     c = conn.cursor()
+    expiry_date = (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d')
     hospitals = [
-        ("Lagos General Hospital", "Lagos"), 
-        ("Abuja Medical Center", "Abuja"), 
-        ("Kano Health Clinic", "Kano"),
-        ("Ibadan Community Hospital", "Ibadan")
+        ("Lagos General Hospital", "Lagos", "active", expiry_date),
+        ("Abuja Medical Center", "Abuja", "active", expiry_date),
+        ("Kano Health Clinic", "Kano", "active", expiry_date),
+        ("Ibadan Community Hospital", "Ibadan", "active", expiry_date),
     ]
-    c.executemany("INSERT OR IGNORE INTO hospitals (name, location) VALUES (?, ?)", hospitals)
+    c.executemany("INSERT OR IGNORE INTO hospitals (name, location, subscription_status, subscription_expiry_date) VALUES (?, ?, ?, ?)", hospitals)
     conn.commit()
     conn.close()
+    print("Hospitals seeded.")
 
 # Seed departments
 def seed_departments():
@@ -86,6 +97,7 @@ def seed_departments():
             c.execute("INSERT OR IGNORE INTO departments (hospital_id, name) VALUES (?, ?)", (hospital_id, dept_name))
     conn.commit()
     conn.close()
+    print("Departments seeded.")
 
 # Seed doctors
 def seed_doctors():
@@ -95,8 +107,7 @@ def seed_doctors():
     schedules = ["Mon-Fri 08:00-16:00", "Mon-Wed 09:00-15:00", "Tue-Thu 10:00-18:00"]
     genders = ["M", "F"]
     for dept in c.execute("SELECT id, hospital_id FROM departments").fetchall():
-        dept_id = dept[0]
-        hospital_id = dept[1]
+        dept_id, hospital_id = dept
         for i in range(2):
             doc_name = doctor_names[i % len(doctor_names)]
             schedule = random.choice(schedules)
@@ -105,6 +116,7 @@ def seed_doctors():
                       (hospital_id, dept_id, doc_name, schedule, gender))
     conn.commit()
     conn.close()
+    print("Doctors seeded.")
 
 # Parse doctor's schedule to get valid hours
 def parse_schedule(schedule):
@@ -125,17 +137,22 @@ def generate_appointments(num_appointments=100):
     c = conn.cursor()
     
     # Fetch necessary data
-    patients = c.execute("SELECT id, age FROM users WHERE role = 'patient'").fetchall()
+    patients = c.execute("SELECT id, age, location, gender, marriage_status, occupation FROM users WHERE role = 'patient'").fetchall()
     doctors = c.execute("SELECT id, hospital_id, department_id, schedule, gender FROM doctors").fetchall()
     hospitals = c.execute("SELECT id, location FROM hospitals").fetchall()
     statuses = ['scheduled', 'no_show', 'attended', 'rescheduled']
+    health_challenges = [
+        "Chest pain and shortness of breath", "Persistent cough", "Severe headache",
+        "Fever and chills", "Joint pain", "Back pain", "Dizziness", "Fatigue and weakness"
+    ]
     
     current_date = datetime.now().date()
     for _ in range(num_appointments):
         patient = random.choice(patients)
-        patient_id, patient_age = patient[0], patient[1]
+        patient_id, patient_age, patient_location, patient_gender, marriage_status, occupation = patient
         doctor = random.choice(doctors)
-        doctor_id, hospital_id, department_id, schedule, doctor_gender = doctor[0], doctor[1], doctor[2], doctor[3], doctor[4]
+        doctor_id, hospital_id, department_id, schedule, doctor_gender = doctor
+        hospital_location = next(h[1] for h in hospitals if h[0] == hospital_id)
         
         # Generate random past date (up to 1 year ago)
         days_back = random.randint(1, 365)
@@ -155,14 +172,21 @@ def generate_appointments(num_appointments=100):
             (patient_id, appt_date)
         ).fetchall()
         previous_no_shows = sum(1 for appt in past_appointments if appt[0] == 'no_show')
-        hospital_location = next(h[1] for h in hospitals if h[0] == hospital_id)
         lead_time = (pd.to_datetime(appt_date) - pd.to_datetime(booking_date)).days
-        distance = 0 if 'Lagos' in hospital_location else 1
+        distance = 1 if patient_location == hospital_location else 0
         time_of_day = 1 if 'AM' in slot_time.upper() else 0
         is_weekday = 0 if pd.to_datetime(appt_date).weekday() < 5 else 1
         doctor_gender_val = 0 if doctor_gender == 'M' else 1
+        patient_gender_val = {'M': 0, 'F': 1, 'Other': 2}.get(patient_gender, 2)
+        marriage_status_val = {'Single': 0, 'Married': 1, 'Divorced': 2, 'Widowed': 3}.get(marriage_status, 0)
+        has_occupation = 1 if occupation and occupation.strip() else 0
+        health_challenge = random.choice(health_challenges)
+        health_challenge_length = len(health_challenge) if health_challenge else 0
         
-        features = [previous_no_shows, lead_time, distance, time_of_day, is_weekday, patient_age, doctor_gender_val]
+        features = [
+            previous_no_shows, lead_time, distance, time_of_day, is_weekday, patient_age,
+            doctor_gender_val, patient_gender_val, marriage_status_val, has_occupation, health_challenge_length
+        ]
         
         # Use predictions if models exist, otherwise use placeholders
         model_files = [
@@ -181,9 +205,11 @@ def generate_appointments(num_appointments=100):
         
         # Insert appointment
         c.execute('''
-            INSERT INTO appointments (patient_id, hospital_id, department_id, doctor_id, slot_time, date, booking_date, no_show_prob, reschedule_prob, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (patient_id, hospital_id, department_id, doctor_id, slot_time, appt_date, booking_date, no_show_prob, reschedule_prob, status))
+            INSERT INTO appointments (patient_id, hospital_id, department_id, doctor_id, slot_time, date, 
+                                     booking_date, no_show_prob, reschedule_prob, status, health_challenge)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (patient_id, hospital_id, department_id, doctor_id, slot_time, appt_date, booking_date,
+              no_show_prob, reschedule_prob, status, health_challenge))
     
     conn.commit()
     conn.close()
@@ -193,10 +219,10 @@ def generate_appointments(num_appointments=100):
 if __name__ == "__main__":
     # Initialize database and seed data
     init_db()
-    print("Database initialized with tables and seed data.")
     clear_appointments()
     seed_users()
     seed_hospitals()
     seed_departments()
     seed_doctors()
     generate_appointments(100)
+    print("Database populated with simulated data.")

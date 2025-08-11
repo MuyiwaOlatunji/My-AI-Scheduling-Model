@@ -2,3 +2,4 @@ handys_env
 
 __pycache__/
 
+database.db

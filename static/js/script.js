@@ -8,42 +8,45 @@ document.addEventListener('DOMContentLoaded', function () {
     const slotAvailabilityDiv = document.getElementById('slotAvailability');
     const submitBtn = document.getElementById('submitBtn');
     const loadingSpinner = document.getElementById('loadingSpinner');
+    const toggleProfileBtn = document.getElementById('toggleProfileBtn');
+    const profileForm = document.getElementById('profileForm');
 
     if (hospitalSelect) {
         hospitalSelect.addEventListener('change', loadDepartments);
+        departmentSelect.disabled = true;
+        doctorSelect.disabled = true;
+        timeSelect.disabled = true;
     }
     if (departmentSelect) {
         departmentSelect.addEventListener('change', loadDoctors);
     }
-    if (doctorSelect) {
+    if (doctorSelect && dateInput) {
         doctorSelect.addEventListener('change', loadAvailableSlots);
-    }
-    if (dateInput) {
-        dateInput.addEventListener('change', function () {
-            const selectedDate = new Date(this.value);
-            const currentDate = new Date();
-            const maxDate = new Date(currentDate.setFullYear(currentDate.getFullYear() + 1));
-            currentDate.setDate(currentDate.getDate() - currentDate.getFullYear() - 1); // Reset to today
-            if (selectedDate < currentDate || selectedDate > maxDate) {
-                alert(`Please select a date between ${currentDate.toISOString().split('T')[0]} and ${maxDate.toISOString().split('T')[0]}.`);
-                this.value = '';
-                resetTimeSelect();
-            } else {
-                loadAvailableSlots();
-            }
-        });
+        dateInput.addEventListener('change', loadAvailableSlots);
     }
     if (timeSelect) {
         timeSelect.addEventListener('change', checkSlotAvailability);
+    }
+    if (toggleProfileBtn && profileForm) {
+        toggleProfileBtn.addEventListener('click', function () {
+            profileForm.classList.toggle('show');
+            this.innerHTML = profileForm.classList.contains('show')
+                ? '<i class="fas fa-user-edit"></i> Hide Profile Update'
+                : '<i class="fas fa-user-edit"></i> Update Profile';
+        });
     }
 
     async function loadDepartments() {
         const hospitalId = hospitalSelect.value;
         resetDependentDropdowns();
-        if (!hospitalId) return;
+        if (!hospitalId) {
+            departmentSelect.disabled = true;
+            return;
+        }
         departmentSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
         try {
             const response = await fetch(`/get_departments/${hospitalId}`);
+            if (!response.ok) throw new Error('Failed to fetch departments');
             const data = await response.json();
             departmentSelect.innerHTML = '<option value="" disabled selected>Select a department</option>';
             data.forEach(dept => {
@@ -52,17 +55,20 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             departmentSelect.disabled = false;
         } catch (error) {
-            departmentSelect.innerHTML = '<option value="" disabled selected>Error loading</option>';
-            console.error('Error:', error);
+            departmentSelect.innerHTML = '<option value="" disabled selected>Error loading departments</option>';
+            departmentSelect.disabled = true;
+            console.error('Error loading departments:', error);
         }
     }
 
     async function loadDoctors() {
         const departmentId = departmentSelect.value;
-        if (!departmentId) return;
         doctorSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
+        doctorSelect.disabled = true;
+        if (!departmentId) return;
         try {
             const response = await fetch(`/get_doctors/${departmentId}`);
+            if (!response.ok) throw new Error('Failed to fetch doctors');
             const data = await response.json();
             doctorSelect.innerHTML = '<option value="" disabled selected>Select a doctor</option>';
             data.forEach(doc => {
@@ -71,15 +77,19 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             doctorSelect.disabled = false;
         } catch (error) {
-            doctorSelect.innerHTML = '<option value="" disabled selected>Error loading</option>';
-            console.error('Error:', error);
+            doctorSelect.innerHTML = '<option value="" disabled selected>Error loading doctors</option>';
+            doctorSelect.disabled = true;
+            console.error('Error loading doctors:', error);
         }
     }
 
     async function loadAvailableSlots() {
         const doctorId = doctorSelect.value;
         const date = dateInput.value;
-        if (!doctorId || !date) return;
+        if (!doctorId || !date) {
+            resetTimeSelect();
+            return;
+        }
         timeSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
         timeSelect.disabled = true;
         slotAvailabilityDiv.textContent = '';
@@ -87,13 +97,17 @@ document.addEventListener('DOMContentLoaded', function () {
         loadingSpinner.style.display = 'block';
         try {
             const response = await fetch(`/get_available_slots?doctor_id=${doctorId}&date=${date}`);
+            if (!response.ok) throw new Error('Failed to fetch slots');
             const data = await response.json();
             loadingSpinner.style.display = 'none';
             timeSelect.innerHTML = '<option value="" disabled selected>Select a time</option>';
             if (data.error) {
                 slotAvailabilityDiv.textContent = data.error;
-                slotAvailabilityDiv.className = 'text-danger';
+                slotAvailabilityDiv.className = 'slot-unavailable';
+                timeSelect.innerHTML = '<option value="" disabled selected>No slots available</option>';
             } else if (!data.length) {
+                slotAvailabilityDiv.textContent = 'No slots available';
+                slotAvailabilityDiv.className = 'slot-unavailable';
                 timeSelect.innerHTML = '<option value="" disabled selected>No slots available</option>';
             } else {
                 data.forEach(slot => {
@@ -101,11 +115,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     timeSelect.appendChild(option);
                 });
                 timeSelect.disabled = false;
+                slotAvailabilityDiv.textContent = 'Please select a time';
+                slotAvailabilityDiv.className = 'slot-available';
+                submitBtn.disabled = false;
             }
         } catch (error) {
             loadingSpinner.style.display = 'none';
-            timeSelect.innerHTML = '<option value="" disabled selected>Error loading</option>';
-            console.error('Error:', error);
+            timeSelect.innerHTML = '<option value="" disabled selected>Error loading slots</option>';
+            slotAvailabilityDiv.textContent = 'Error loading slots';
+            slotAvailabilityDiv.className = 'slot-unavailable';
+            console.error('Error loading slots:', error);
         }
     }
 
@@ -113,22 +132,22 @@ document.addEventListener('DOMContentLoaded', function () {
         const doctorId = doctorSelect.value;
         const date = dateInput.value;
         const time = timeSelect.value;
-        if (!doctorId || !date || !time) return;
-        slotAvailabilityDiv.textContent = '';
-        submitBtn.disabled = true;
-        loadingSpinner.style.display = 'block';
+        if (!doctorId || !date || !time) {
+            submitBtn.disabled = true;
+            return;
+        }
         try {
-            const response = await fetch(`/check_slot?doctor_id=${doctorId}&date=${date}&time=${encodeURIComponent(time)}`);
+            const response = await fetch(`/check_slot?doctor_id=${doctorId}&date=${date}&time=${time}`);
+            if (!response.ok) throw new Error('Failed to check slot');
             const data = await response.json();
-            loadingSpinner.style.display = 'none';
             slotAvailabilityDiv.textContent = data.available ? 'Slot available' : 'Slot unavailable';
-            slotAvailabilityDiv.className = data.available ? 'text-success' : 'text-danger';
+            slotAvailabilityDiv.className = data.available ? 'slot-available' : 'slot-unavailable';
             submitBtn.disabled = !data.available;
         } catch (error) {
-            loadingSpinner.style.display = 'none';
             slotAvailabilityDiv.textContent = 'Error checking slot';
-            slotAvailabilityDiv.className = 'text-danger';
-            console.error('Error:', error);
+            slotAvailabilityDiv.className = 'slot-unavailable';
+            submitBtn.disabled = true;
+            console.error('Error checking slot:', error);
         }
     }
 
@@ -181,32 +200,12 @@ document.addEventListener('DOMContentLoaded', function () {
         deptDiv.querySelector('.doctors').appendChild(newDoctor);
     };
 
-    // Admin Dashboard Auto-Reschedule
-    document.querySelectorAll('.auto-reschedule-btn').forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            const apptId = this.getAttribute('data-appt-id');
-            if (confirm('Are you sure you want to auto-reschedule this appointment?')) {
-                fetch(`/auto_reschedule/${apptId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    alert(data.message);
-                    if (data.status === 'success') location.reload();
-                })
-                .catch(error => alert('Error: ' + error.message));
-            }
-        });
-    });
-
     // Alert Fading
     const alerts = document.querySelectorAll('.alert');
     alerts.forEach(alert => {
         setTimeout(() => {
             alert.classList.add('fade');
             setTimeout(() => alert.remove(), 500);
-        }, 8000);
+        }, 5000);
     });
 });
