@@ -341,8 +341,9 @@ def predict_no_show(features):
     try:
         rf_model = joblib.load('model/rf_no_show_model.pkl')
         xgb_model = joblib.load('model/xgb_no_show_model.pkl')
-        feature_cols = ['lead_time', 'distance', 'time_of_day', 'is_weekday', 'age', 'doctor_gender', 'health_challenge_length']
-        features_df = pd.DataFrame([features[-7:]], columns=feature_cols)  # Use last 7 features
+        # Expected features based on training (adjust if needed)
+        feature_cols = ['lead_time', 'distance', 'time_of_day', 'is_weekday', 'age', 'doctor_gender']
+        features_df = pd.DataFrame([features[:6]], columns=feature_cols)  # Use only common features
         rf_prob = rf_model.predict_proba(features_df)[0][1]
         xgb_prob = xgb_model.predict_proba(features_df)[0][1]
         ensemble_prob = (rf_prob + xgb_prob) / 2 * 100  # Scale to 0-100
@@ -355,8 +356,9 @@ def predict_reschedule(features):
     try:
         rf_model = joblib.load('model/rf_reschedule_model.pkl')
         xgb_model = joblib.load('model/xgb_reschedule_model.pkl')
-        feature_cols = ['lead_time', 'distance', 'time_of_day', 'is_weekday', 'age', 'doctor_gender', 'health_challenge_length']
-        features_df = pd.DataFrame([features[-7:]], columns=feature_cols)  # Use last 7 features
+        # Expected features based on training (adjust if needed)
+        feature_cols = ['lead_time', 'distance', 'time_of_day', 'is_weekday', 'age', 'doctor_gender']
+        features_df = pd.DataFrame([features[:6]], columns=feature_cols)  # Use only common features
         rf_prob = rf_model.predict_proba(features_df)[0][1]
         xgb_prob = xgb_model.predict_proba(features_df)[0][1]
         ensemble_prob = (rf_prob + xgb_prob) / 2 * 100  # Scale to 0-100
@@ -514,14 +516,10 @@ def book_appointment():
         distance = 0 if patient['location'] == hospital_location else 1
         time_of_day = 1 if 'AM' in slot_time.upper() else 0
         is_weekday = 0 if appointment_date.weekday() < 5 else 1
-        patient_gender = {'M': 0, 'F': 1, 'Other': 2}[patient['gender']]
-        marriage_status = {'Single': 0, 'Married': 1, 'Divorced': 2, 'Widowed': 3}[patient['marriage_status']]
-        has_occupation = 1 if patient['occupation'].strip() else 0
         doctor_gender = query_db("SELECT gender FROM doctors WHERE id = ?", (doctor_id,), one=True)['gender']
         doctor_gender_val = 0 if doctor_gender == 'M' else 1
-        health_challenge_length = len(health_challenge)
-        features = [previous_no_shows, lead_time, distance, time_of_day, is_weekday, patient['age'], doctor_gender_val,
-                    patient_gender, marriage_status, has_occupation, health_challenge_length]
+        # Use only the features the models expect
+        features = [lead_time, distance, time_of_day, is_weekday, patient['age'], doctor_gender_val]
         no_show_prob = predict_no_show(features)
         reschedule_prob = predict_reschedule(features)
 
@@ -887,17 +885,10 @@ def reschedule(appt_id):
     distance = 0 if patient['location'] == hospital_location else 1
     time_of_day = 1 if 'AM' in new_time.upper() else 0
     is_weekday = 0 if appointment_date.weekday() < 5 else 1
-    patient_gender = {'M': 0, 'F': 1, 'Other': 2}[patient['gender']]
-    marriage_status = {'Single': 0, 'Married': 1, 'Divorced': 2, 'Widowed': 3}[patient['marriage_status']]
-    has_occupation = 1 if patient['occupation'].strip() else 0
     doctor_gender = query_db("SELECT gender FROM doctors WHERE id = ?", (appointment['doctor_id'],), one=True)['gender']
     doctor_gender_val = 0 if doctor_gender == 'M' else 1
-    health_challenge = appointment['health_challenge']
-    health_challenge_length = len(health_challenge) if health_challenge else 0
-    past_appointments = query_db("SELECT status FROM appointments WHERE patient_id = ? AND date < ?", (appointment['patient_id'], new_date))
-    previous_no_shows = sum(1 for appt in past_appointments if appt['status'] == 'no_show')
-    features = [previous_no_shows, lead_time, distance, time_of_day, is_weekday, patient['age'], doctor_gender_val,
-                patient_gender, marriage_status, has_occupation, health_challenge_length]
+    # Use only the features the models expect
+    features = [lead_time, distance, time_of_day, is_weekday, patient['age'], doctor_gender_val]
     no_show_prob = predict_no_show(features)
     reschedule_prob = predict_reschedule(features)
     query = "UPDATE appointments SET date = ?, slot_time = ?, status = 'rescheduled', no_show_prob = ?, reschedule_prob = ? WHERE id = ?"
