@@ -9,6 +9,21 @@
 </head>
 <body>
     <div class="container">
+    <div class="hospital-welcome">Welcome to {{ hospital_name }}</div>
+    <h1>Hospital Admin Dashboard</h1>
+    <a href="{{ url_for('logout') }}" class="btn logout-btn">Logout</a>
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Search..." value="{{ search_query }}">
+        <select id="searchType">
+            <option value="name" {% if search_type == 'name' %}selected{% endif %}>Name</option>
+            <option value="email" {% if search_type == 'email' %}selected{% endif %}>Email</option>
+            <option value="department" {% if search_type == 'department' %}selected{% endif %}>Department</option>
+            <option value="doctor" {% if search_type == 'doctor' %}selected{% endif %}>Doctor</option>
+        </select>
+    </div>
+    <div id="searchResults"></div>
+    
+    <div class="container">
         <h1>Hospital Admin Dashboard</h1>
         <a href="{{ url_for('logout') }}" class="btn logout-btn">Logout</a>
         <div class="search-bar">
