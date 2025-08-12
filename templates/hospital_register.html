@@ -4,50 +4,67 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register Hospital</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <nav class="navbar">
         <div class="container">
-            <div class="navbar-brand">Patient Appointment System</div>
+            <a href="{{ url_for('index') }}" class="navbar-brand">HealthSync</a>
             <div class="navbar-links">
-                <a href="{{ url_for('super_admin_dashboard') }}" class="nav-link">Back to Dashboard</a>
+                <a href="{{ url_for('super_admin_dashboard') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('hospital_register') }}" class="nav-link active">Register Hospital</a>
                 <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
             </div>
         </div>
     </nav>
-    <div class="container form-container">
-        <h1>Register Hospital</h1>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        <form method="POST">
-            <div class="form-group">
-                <label for="hospital_name" class="form-label">Hospital Name</label>
-                <input type="text" id="hospital_name" name="hospital_name" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="location" class="form-label">Location</label>
-                <input type="text" id="location" name="location" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="admin_name" class="form-label">Admin Name</label>
-                <input type="text" id="admin_name" name="admin_name" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="admin_email" class="form-label">Admin Email</label>
-                <input type="email" id="admin_email" name="admin_email" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="admin_password" class="form-label">Admin Password</label>
-                <input type="password" id="admin_password" name="admin_password" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-primary">Register Hospital</button>
-        </form>
+
+    <div class="container">
+        <div class="form-card">
+            <h2>Register Hospital</h2>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            <form method="POST" action="">
+                <div class="form-group">
+                    <label for="hospital_name" class="form-label">Hospital Name</label>
+                    <input type="text" id="hospital_name" name="hospital_name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="location" class="form-label">Location</label>
+                    <input type="text" id="location" name="location" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="admin_name" class="form-label">Admin Name</label>
+                    <input type="text" id="admin_name" name="admin_name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="admin_email" class="form-label">Admin Email</label>
+                    <input type="email" id="admin_email" name="admin_email" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="admin_password" class="form-label">Admin Password</label>
+                    <input type="password" id="admin_password" name="admin_password" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Register</button>
+            </form>
+        </div>
     </div>
+
+    <div class="notifications"></div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash-message {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

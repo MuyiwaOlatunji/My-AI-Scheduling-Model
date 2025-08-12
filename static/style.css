@@ -1,0 +1,564 @@
+/* General Reset and Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  color: #2D3748; /* Warm dark gray */
+  background: linear-gradient(135deg, #FFF7ED 0%, #FEEBC8 100%); /* Enhanced gradient background */
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Typography */
+h1, h2, h3, h4 {
+  font-weight: 700;
+  color: #7C3AED; /* Warm purple for headings */
+}
+h1 { font-size: 2.25rem; margin-bottom: 1.5rem; }
+h2 { font-size: 1.75rem; margin-bottom: 1rem; }
+h3 { font-size: 1.25rem; margin-bottom: 0.75rem; }
+p { margin-bottom: 1rem; font-size: 1rem; }
+.subtitle {
+  color: #4B5563; /* Neutral gray */
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+}
+
+/* Navigation Bar */
+.navbar {
+  background: rgba(255, 255, 255, 0.9); /* Glassmorphism effect */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 1rem 0;
+  border-bottom: 1px solid #EDE9FE;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+.navbar-brand {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #7C3AED;
+  transition: color 0.3s ease;
+}
+.navbar-brand:hover {
+  color: #A78BFA;
+}
+.navbar-links a.nav-link {
+  color: #4B5563;
+  font-weight: 500;
+  font-size: 0.9rem;
+  margin-left: 1.25rem;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+.navbar-links a.nav-link:hover {
+  color: #7C3AED;
+}
+.navbar-links a.nav-link.active {
+  color: #7C3AED;
+  border-bottom: 2px solid #7C3AED;
+}
+
+/* Container */
+.container {
+  max-width: 1280px;
+  margin: 2rem auto;
+  padding: 0 1.5rem;
+}
+
+/* Buttons */
+.btn {
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  backdrop-filter: blur(5px);
+  background: rgba(124, 58, 237, 0.9); /* Glassmorphism with purple */
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+}
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+}
+.btn-primary {
+  background: rgba(124, 58, 237, 0.9);
+  color: #FFFFFF;
+}
+.btn-primary:hover {
+  background: rgba(109, 40, 217, 0.95);
+}
+.btn-primary:disabled {
+  background: rgba(196, 181, 253, 0.7);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.btn-secondary {
+  background: rgba(107, 114, 128, 0.9);
+  color: #FFFFFF;
+}
+.btn-secondary:hover {
+  background: rgba(75, 85, 99, 0.95);
+}
+.btn-success {
+  background: rgba(52, 211, 153, 0.9);
+  color: #FFFFFF;
+}
+.btn-success:hover {
+  background: rgba(34, 197, 94, 0.95);
+}
+.btn-danger {
+  background: rgba(248, 113, 113, 0.9);
+  color: #FFFFFF;
+}
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.95);
+}
+.btn-warning {
+  background: rgba(251, 191, 36, 0.9);
+  color: #1F2937;
+}
+.btn-warning:hover {
+  background: rgba(245, 158, 11, 0.95);
+}
+.btn-sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  border-radius: 6px;
+}
+.btn-icon {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+}
+.btn-sm[title]:hover:after, .btn-icon[title]:hover:after {
+  content: attr(title);
+  position: absolute;
+  top: -2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(45, 55, 72, 0.9);
+  color: #FFFFFF;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+/* Forms */
+.form-card {
+  max-width: 400px;
+  margin: 1rem auto;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.9); /* Glassmorphism */
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+}
+.form-label {
+  font-weight: 600;
+  color: #7C3AED;
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+.form-control, .form-select {
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+  padding: 0.75rem;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.95);
+  color: #2D3748;
+  width: 100%;
+}
+.form-control:focus, .form-select:focus {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.2);
+  outline: none;
+}
+.form-control.d-inline-block {
+  width: auto;
+  max-width: 120px;
+  padding: 0.5rem;
+  font-size: 0.9rem;
+}
+.form-control:invalid {
+  border-color: #F87171;
+  box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.2);
+}
+.form-group {
+  margin-bottom: 1.5rem;
+}
+.form-control.textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Alerts and Notifications */
+.alert {
+  border-radius: 8px;
+  padding: 1rem;
+  font-size: 0.95rem;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 320px;
+  z-index: 1000;
+  animation: slideIn 0.5s ease-out;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+.alert-success {
+  background: rgba(209, 250, 229, 0.9);
+  color: #065F46;
+}
+.alert-danger {
+  background: rgba(254, 226, 226, 0.9);
+  color: #991B1B;
+}
+.alert-info {
+  background: rgba(219, 234, 254, 0.9);
+  color: #1E40AF;
+}
+.alert-warning {
+  background: rgba(254, 243, 199, 0.9);
+  color: #92400E;
+}
+.alert.fade {
+  opacity: 0;
+}
+@keyframes slideIn {
+  from { right: -320px; }
+  to { right: 20px; }
+}
+
+/* Risk Flagging */
+.table td.high-risk {
+  color: #F87171;
+  font-weight: 600;
+}
+.table td.low-risk {
+  color: #34D399;
+  font-weight: 600;
+}
+
+/* Tables */
+.table {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1.5rem;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.table th, .table td {
+  padding: 0.9rem;
+  vertical-align: middle;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #E5E7EB;
+  text-align: left;
+}
+.table thead {
+  background: linear-gradient(90deg, #7C3AED, #A78BFA);
+  color: #FFFFFF;
+}
+.table-striped tbody tr:nth-of-type(odd) {
+  background: rgba(249, 250, 251, 0.5);
+}
+.table-hover tbody tr:hover {
+  background: rgba(237, 233, 254, 0.5);
+}
+.table td .btn-container {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* Slot Availability */
+.slot-available {
+  color: #34D399;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.slot-unavailable, .error-message {
+  color: #F87171;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Spinner */
+.spinner-border {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+#loadingSpinner {
+  border: 4px solid #7C3AED;
+  border-top: 4px solid #FFFFFF;
+  border-radius: 50%;
+  width: 1.5rem;
+  height: 1.5rem;
+  animation: spin 1s linear infinite;
+  display: none;
+  margin: 0.75rem auto;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Sorting Links */
+p a {
+  color: #7C3AED;
+  text-decoration: none;
+  font-weight: 600;
+  margin: 0 0.75rem;
+  transition: color 0.3s ease;
+}
+p a:hover {
+  color: #6D28D9;
+  text-decoration: underline;
+}
+
+/* Search Bar */
+.search-container {
+  margin-bottom: 1.5rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+.search-container .form-control {
+  width: 300px;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+  transition: all 0.3s ease;
+}
+.search-container .form-control:focus {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.2);
+  outline: none;
+}
+.search-container .form-select {
+  width: 180px;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+  transition: all 0.3s ease;
+}
+.search-container .form-select:focus {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.2);
+  outline: none;
+}
+
+/* Toggleable Profile Form */
+#profileForm {
+  display: none;
+}
+#profileForm.show {
+  display: block;
+}
+
+/* Auth Cards (Index Page) */
+.auth-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+}
+.auth-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  width: 300px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+.auth-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: center;
+  font-size: 1.3rem;
+  margin-bottom: 0.75rem;
+}
+.auth-card p {
+  color: #4B5563;
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+}
+.auth-card .btn-container {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+/* Patient Dashboard Adjustments */
+.patient-actions {
+  display: flex;
+  justify-content: flex-end; /* Move Book Appointment to right */
+  margin-bottom: 1.5rem;
+}
+.patient-actions .btn {
+  padding: 0.9rem 2rem; /* Enhanced padding */
+  font-size: 1.1rem;
+  border-radius: 10px;
+  background: linear-gradient(45deg, #7C3AED, #A78BFA); /* Gradient effect */
+  color: #FFFFFF;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.patient-actions .btn:hover {
+  background: linear-gradient(45deg, #6D28D9, #9B59B6);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(124, 58, 237, 0.4);
+}
+
+/* Hospital Admin Dashboard Adjustments */
+.manage-actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.manage-actions .btn {
+  padding: 0.75rem 1.5rem;
+}
+.hospital-welcome {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #7C3AED;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 1rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+/* Manage Departments Adjustments */
+.department-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  padding: 1.2rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+  backdrop-filter: blur(10px);
+}
+.add-doctor-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  padding: 1.2rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  max-width: 300px;
+  display: none;
+  backdrop-filter: blur(10px);
+}
+.add-doctor-card.show {
+  display: block;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  h1 { font-size: 1.75rem; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.125rem; }
+  .navbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .navbar-links {
+    margin-top: 1rem;
+  }
+  .navbar-links a.nav-link {
+    margin-left: 0;
+    padding: 0.5rem 0;
+    font-size: 0.85rem;
+  }
+  .btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+  }
+  .btn-sm {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+  }
+  .form-control.d-inline-block {
+    max-width: 100px;
+    font-size: 0.85rem;
+    padding: 0.4rem;
+  }
+  .table {
+    font-size: 0.85rem;
+  }
+  .container {
+    padding: 0 1rem;
+    margin: 1.5rem auto;
+  }
+  .form-control, .form-select {
+    font-size: 0.9rem;
+    padding: 0.6rem;
+  }
+  .form-card, .form-container {
+    padding: 1.2rem;
+  }
+  .form-control.textarea {
+    min-height: 60px;
+  }
+  .search-container .form-control {
+    width: 100%;
+  }
+  .search-container .form-select {
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+  .auth-card {
+    width: 100%;
+  }
+  .patient-actions {
+    justify-content: center;
+  }
+  .patient-actions .btn {
+    width: 100%;
+    margin: 0;
+  }
+  .manage-actions {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .department-card {
+    padding: 0.9rem;
+  }
+  .add-doctor-card {
+    max-width: 100%;
+  }
+  .hospital-welcome {
+    font-size: 1.5rem;
+    padding: 0.75rem;
+  }
+}
+
+.disabled-btn {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

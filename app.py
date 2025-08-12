@@ -12,15 +12,15 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 import joblib
-from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
+from sklearn.preprocessing import LabelEncoder
+import random
 import re
 
 # Load environment variables
 load_dotenv()
 
 # Initialize Flask app
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 app.secret_key = os.getenv("SECRET_KEY", "your_secret_key")
 
 # Flask-Mail configuration
@@ -66,7 +66,6 @@ def get_sqlite_conn():
 def init_db():
     conn = get_sqlite_conn()
     c = conn.cursor()
-    # Create tables if they don't exist
     c.execute('''CREATE TABLE IF NOT EXISTS hospitals 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, location TEXT, 
                   subscription_status TEXT DEFAULT 'pending', subscription_expiry_date TEXT)''')
@@ -90,16 +89,13 @@ def init_db():
                   FOREIGN KEY (department_id) REFERENCES departments(id),
                   FOREIGN KEY (doctor_id) REFERENCES doctors(id))''')
 
-    # Seed initial data only if no users exist
     if not query_db("SELECT COUNT(*) FROM users", one=True)['COUNT(*)']:
-        # Seed hospitals with subscription data
         hospitals = [
             ("Lagos General Hospital", "Lagos", "active", (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d')),
             ("Abuja Medical Center", "Abuja", "active", (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d')),
         ]
         c.executemany("INSERT INTO hospitals (name, location, subscription_status, subscription_expiry_date) VALUES (?, ?, ?, ?)", hospitals)
         
-        # Seed super admin and patient
         admin_email = "admin@example.com"
         admin_password = generate_password_hash("adminpassword")
         patient_email = "patient@example.com"
@@ -109,7 +105,6 @@ def init_db():
         c.execute("INSERT INTO users (name, email, phone, password, role, age, location, gender, marriage_status, occupation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                   ("Test Patient", patient_email, "0987654321", patient_password, "patient", 25, "Lagos", "M", "Single", "Engineer"))
         
-        # Seed sample departments and doctors
         c.execute("INSERT INTO departments (hospital_id, name) VALUES (?, ?)", (1, "Cardiology"))
         c.execute("INSERT INTO departments (hospital_id, name) VALUES (?, ?)", (2, "Neurology"))
         c.execute("INSERT INTO doctors (hospital_id, department_id, name, gender, schedule) VALUES (?, ?, ?, ?, ?)",
@@ -229,6 +224,47 @@ def find_available_slot(doctor_id, current_date, patient_id, max_attempts=7):
                 return new_date, slot
     return None, None
 
+# Simulate appointments for prediction (not training)
+def simulate_appointments(num_appointments):
+    appointments = []
+    current_date = datetime.now()
+    for _ in range(num_appointments):
+        patient_id = random.randint(1, 100)
+        hospital_id = random.choice([1, 2])
+        department_id = random.choice([1, 2])
+        doctor_id = random.choice([1, 2])
+        appt_date = (current_date + timedelta(days=random.randint(1, 60))).strftime('%Y-%m-%d')
+        slot_time = random.choice(['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM'])
+        booking_date = current_date.strftime('%Y-%m-%d')
+        status = random.choice(['scheduled', 'attended', 'no-show', 'cancelled', 'rescheduled'])
+        lead_time = random.randint(1, 30)
+        location = random.choice(['Lagos', 'Abuja'])  # Added location
+        distance = random.choice([0, 1])
+        time_of_day = 1 if 'AM' in slot_time else 0
+        is_weekday = 0 if datetime.strptime(appt_date, '%Y-%m-%d').weekday() < 5 else 1
+        age = random.randint(18, 70)
+        doctor_gender = random.choice(['M', 'F'])
+        patient_gender = random.choice(['M', 'F', 'Other'])
+        marriage_status = random.choice(['Single', 'Married', 'Divorced', 'Widowed'])
+        has_occupation = random.choice([0, 1])
+        health_challenge = "Sample challenge" if random.random() > 0.5 else ""
+        health_challenge_length = len(health_challenge) if health_challenge else 0
+        previous_no_shows = random.randint(0, 5)
+
+        appointments.append({
+            'patient_id': patient_id, 'hospital_id': hospital_id, 'department_id': department_id,
+            'doctor_id': doctor_id, 'slot_time': slot_time, 'date': appt_date, 'booking_date': booking_date,
+            'status': status, 'lead_time': lead_time, 'distance': distance, 'time_of_day': time_of_day,
+            'is_weekday': is_weekday, 'age': age, 'doctor_gender': doctor_gender, 'patient_gender': patient_gender,
+            'marriage_status': marriage_status, 'has_occupation': has_occupation, 
+            'health_challenge': health_challenge, 'health_challenge_length': health_challenge_length,
+            'previous_no_shows': previous_no_shows, 'location': location
+        })
+    df = pd.DataFrame(appointments)
+    df['no_show'] = df['status'].apply(lambda x: 1 if x == 'no-show' else 0)
+    df['reschedule'] = df['status'].apply(lambda x: 1 if x == 'rescheduled' else 0)
+    return df
+
 # Check no-shows and reschedule
 def check_no_shows_and_reschedule():
     with app.app_context():
@@ -265,14 +301,21 @@ def check_no_shows_and_reschedule():
                 )
                 previous_no_shows = sum(1 for a in past_appointments if a['status'] == 'no_show')
                 hospital_location = query_db("SELECT location FROM hospitals WHERE id = ?", (appt['hospital_id'],), one=True)['location']
+                patient = query_db("SELECT * FROM users WHERE id = ?", (patient_id,), one=True)
                 lead_time = (appointment_date - current_date_dt).days
-                distance = 0 if 'Lagos' in hospital_location else 1
+                distance = 0 if patient['location'] == hospital_location else 1
                 time_of_day = 1 if 'AM' in new_time.upper() else 0
                 is_weekday = 0 if appointment_date.weekday() < 5 else 1
-                user_age = query_db("SELECT age FROM users WHERE id = ?", (patient_id,), one=True)['age']
+                user_age = patient['age']
                 doctor_gender = query_db("SELECT gender FROM doctors WHERE id = ?", (doctor_id,), one=True)['gender']
                 doctor_gender_val = 0 if doctor_gender == 'M' else 1
-                features = [previous_no_shows, lead_time, distance, time_of_day, is_weekday, user_age, doctor_gender_val]
+                patient_gender = {'M': 0, 'F': 1, 'Other': 2}.get(patient['gender'], 2)
+                marriage_status = {'Single': 0, 'Married': 1, 'Divorced': 2, 'Widowed': 3}.get(patient['marriage_status'], 0)
+                has_occupation = 1 if patient['occupation'] and patient['occupation'].strip() else 0
+                health_challenge = appt.get('health_challenge', '')
+                health_challenge_length = len(health_challenge) if health_challenge else 0
+                features = [previous_no_shows, lead_time, distance, time_of_day, is_weekday, user_age, doctor_gender_val,
+                            patient_gender, marriage_status, has_occupation, health_challenge_length]
                 no_show_prob = predict_no_show(features)
                 reschedule_prob = predict_reschedule(features)
                 query = """
@@ -292,80 +335,36 @@ def check_no_shows_and_reschedule():
                 send_reschedule_notification(appt['email'], appointment_details)
                 flash(f"Appointment ID {appt_id} rescheduled to {new_date} at {new_time}.", "success")
 
-# Retrain the model with patient inputs
-def retrain_model():
-    with app.app_context():
-        today = date.today().strftime('%Y-%m-%d')
-        query = """
-        SELECT a.*, u.age, h.location, doc.gender, a.health_challenge
-        FROM appointments a
-        JOIN users u ON a.patient_id = u.id
-        JOIN hospitals h ON a.hospital_id = h.id
-        JOIN doctors doc ON a.doctor_id = doc.id
-        WHERE a.date < ? AND a.status IN ('attended', 'no_show')
-        """
-        past_appts = query_db(query, (today,))
-        if not past_appts:
-            app.logger.info("No past appointments to retrain the model.")
-            return
-
-        data = pd.DataFrame(past_appts)
-        data['booking_date'] = pd.to_datetime(data['booking_date'])
-        data['appointment_date'] = pd.to_datetime(data['date'])
-        data['lead_time'] = (data['appointment_date'] - data['booking_date']).dt.days
-        data['distance'] = data['location'].apply(lambda x: 0 if 'Lagos' in x else 1)
-        data['time_of_day'] = data['slot_time'].apply(lambda x: 1 if 'AM' in x.upper() else 0)
-        data['is_weekday'] = data['appointment_date'].dt.weekday.apply(lambda x: 0 if x < 5 else 1)
-        data['doctor_gender'] = data['gender'].map({'M': 0, 'F': 1})
-        data['no_show'] = data['status'].apply(lambda x: 1 if x == 'no_show' else 0)
-        data['health_challenge_length'] = data['health_challenge'].apply(lambda x: len(x) if x else 0)
-
-        features = ['lead_time', 'distance', 'time_of_day', 'is_weekday', 'age', 'doctor_gender', 'health_challenge_length']
-        X = data[features].fillna(0)
-        y_no_show = data['no_show']
-
-        # Retrain RandomForest for no-show
-        rf_ns = RandomForestClassifier(n_estimators=100, random_state=42)
-        rf_ns.fit(X, y_no_show)
-        joblib.dump(rf_ns, 'model/rf_no_show_model.pkl')
-
-        # Retrain XGBoost for no-show
-        xgb_ns = XGBClassifier(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42)
-        xgb_ns.fit(X, y_no_show)
-        joblib.dump(xgb_ns, 'model/xgb_no_show_model.pkl')
-
-        app.logger.info("Models retrained successfully.")
-
 # Prediction functions using trained models
 def predict_no_show(features):
     try:
         rf_model = joblib.load('model/rf_no_show_model.pkl')
         xgb_model = joblib.load('model/xgb_no_show_model.pkl')
-        # Expected features based on training (adjust if needed)
-        feature_cols = ['lead_time', 'distance', 'time_of_day', 'is_weekday', 'age', 'doctor_gender']
-        features_df = pd.DataFrame([features[:6]], columns=feature_cols)  # Use only common features
+        feature_cols = ['previous_no_shows', 'lead_time', 'distance', 'time_of_day', 'is_weekday', 'age', 'doctor_gender',
+                        'patient_gender', 'marriage_status', 'has_occupation', 'health_challenge_length']
+        features_df = pd.DataFrame([features], columns=feature_cols)
         rf_prob = rf_model.predict_proba(features_df)[0][1]
         xgb_prob = xgb_model.predict_proba(features_df)[0][1]
-        ensemble_prob = (rf_prob + xgb_prob) / 2 * 100  # Scale to 0-100
+        ensemble_prob = (rf_prob + xgb_prob) / 2 * 100
         return ensemble_prob
     except Exception as e:
         app.logger.error(f"Error predicting no-show: {e}")
-        return 10.0  # Fallback value
+        return 10.0
 
 def predict_reschedule(features):
     try:
         rf_model = joblib.load('model/rf_reschedule_model.pkl')
         xgb_model = joblib.load('model/xgb_reschedule_model.pkl')
-        # Expected features based on training (adjust if needed)
-        feature_cols = ['lead_time', 'distance', 'time_of_day', 'is_weekday', 'age', 'doctor_gender']
-        features_df = pd.DataFrame([features[:6]], columns=feature_cols)  # Use only common features
+        feature_cols = ['previous_no_shows', 'lead_time', 'distance', 'time_of_day', 'is_weekday', 'age', 'doctor_gender',
+                        'patient_gender', 'marriage_status', 'has_occupation', 'health_challenge_length']
+        features_df = pd.DataFrame([features], columns=feature_cols)
         rf_prob = rf_model.predict_proba(features_df)[0][1]
         xgb_prob = xgb_model.predict_proba(features_df)[0][1]
-        ensemble_prob = (rf_prob + xgb_prob) / 2 * 100  # Scale to 0-100
+        ensemble_prob = (rf_prob + xgb_prob) / 2 * 100
         return ensemble_prob
     except Exception as e:
         app.logger.error(f"Error predicting reschedule: {e}")
-        return 10.0  # Fallback value
+        return 10.0
 
 # Routes
 @app.route('/')
@@ -447,32 +446,51 @@ def logout():
     flash("Logged out successfully.", "success")
     return redirect(url_for('index'))
 
+@app.route('/cancel_appointment/<int:appt_id>', methods=['GET'])
+def cancel_appointment(appt_id):
+    app.logger.info(f"Attempting to cancel appointment with ID: {appt_id}")
+    if 'user_id' not in session:
+        flash('Please log in to cancel an appointment.', 'danger')
+        return redirect(url_for('login'))
+    
+    try:
+        conn = sqlite3.connect('database.db')
+        cursor = conn.cursor()
+        cursor.execute('UPDATE appointments SET status = ? WHERE id = ? AND patient_id = ?', ('canceled', appt_id, session['user_id']))
+        conn.commit()
+        if cursor.rowcount == 0:
+            flash('Appointment not found or you do not have permission to cancel it.', 'danger')
+        else:
+            flash('Appointment canceled successfully.', 'success')
+    except sqlite3.Error as e:
+        flash(f'Database error: {e}', 'danger')
+    finally:
+        conn.close()
+    
+    return redirect(url_for('patient_dashboard'))
+
 @app.route('/patient')
-@login_required('patient')
 def patient_dashboard():
-    sort_by = request.args.get('sort_by', 'date')
-    sort_order = request.args.get('sort_order', 'asc')
-    if sort_by not in ['date', 'status']:
-        sort_by = 'date'
-    if sort_order not in ['asc', 'desc']:
-        sort_order = 'asc'
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
     
-    app.logger.info(f"Fetching appointments for user_id: {session['user_id']}")
-    conn = get_sqlite_conn()
+    conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT h.name, d.name, doc.name, a.date, a.slot_time, a.status, a.id
-        FROM appointments a
-        JOIN hospitals h ON a.hospital_id = h.id
-        JOIN departments d ON a.department_id = d.id
-        JOIN doctors doc ON a.doctor_id = doc.id
-        WHERE a.patient_id = ?
-        ORDER BY {} {}
-    """.format(sort_by, sort_order), (session['user_id'],))
+    cursor.execute('SELECT a.id, h.name AS hospital_name, d.name AS department_name, doc.name AS doctor_name, a.date, a.slot_time, a.status, a.doctor_id '
+                   'FROM appointments a '
+                   'JOIN hospitals h ON a.hospital_id = h.id '
+                   'JOIN departments d ON a.department_id = d.id '
+                   'JOIN doctors doc ON a.doctor_id = doc.id '
+                   'WHERE a.patient_id = ?', (session['user_id'],))
     appointments = cursor.fetchall()
-    conn.close()
-    app.logger.info(f"Found {len(appointments)} appointments for user_id: {session['user_id']}")
+    appointments = [{'id': row[0], 'name': row[1], 'name_1': row[2], 'name_2': row[3], 'date': row[4], 'slot_time': row[5], 'status': row[6], 'doctor_id': row[7]} for row in appointments]
     
+    current_date = datetime.now()
+    for appt in appointments:
+        appointment_date = datetime.strptime(appt['date'], '%Y-%m-%d')
+        appt['lead_time'] = (appointment_date - current_date).days
+    
+    conn.close()
     return render_template('patient.html', appointments=appointments)
 
 @app.route('/book', methods=['GET', 'POST'])
@@ -518,8 +536,12 @@ def book_appointment():
         is_weekday = 0 if appointment_date.weekday() < 5 else 1
         doctor_gender = query_db("SELECT gender FROM doctors WHERE id = ?", (doctor_id,), one=True)['gender']
         doctor_gender_val = 0 if doctor_gender == 'M' else 1
-        # Use only the features the models expect
-        features = [lead_time, distance, time_of_day, is_weekday, patient['age'], doctor_gender_val]
+        patient_gender = {'M': 0, 'F': 1, 'Other': 2}.get(patient['gender'], 2)
+        marriage_status = {'Single': 0, 'Married': 1, 'Divorced': 2, 'Widowed': 3}.get(patient['marriage_status'], 0)
+        has_occupation = 1 if patient['occupation'] and patient['occupation'].strip() else 0
+        health_challenge_length = len(health_challenge) if health_challenge else 0
+        features = [previous_no_shows, lead_time, distance, time_of_day, is_weekday, patient['age'], doctor_gender_val,
+                    patient_gender, marriage_status, has_occupation, health_challenge_length]
         no_show_prob = predict_no_show(features)
         reschedule_prob = predict_reschedule(features)
 
@@ -632,44 +654,42 @@ def super_admin_dashboard():
     hospitals = query_db(query, args)
     return render_template('super_admin.html', hospitals=hospitals, search_query=search_query)
 
-@app.route('/hospital_admin')
+@app.route('/search_appointments')
 @login_required(['hospital_admin'])
-def hospital_admin_dashboard():
+def search_appointments():
     user_id = session['user_id']
-    user = query_db("SELECT hospital_id FROM users WHERE id = ?", (user_id,), one=True)
-    hospital_id = user['hospital_id']
-    search_query = request.args.get('search', '')
+    hospital = query_db("SELECT hospital_id, name FROM hospitals WHERE id = (SELECT hospital_id FROM users WHERE id = ?)", (user_id,), one=True)
+    if not hospital:
+        return jsonify({'error': 'Hospital not found'}), 404
+    search_query = request.args.get('search', '').strip()
     search_type = request.args.get('search_type', 'name')
+    if not search_query:
+        return jsonify([])
+    
     query = """
-    SELECT a.id, u.name, u.email, d.name AS department_name, doc.name AS doctor_name, 
-           a.slot_time, a.date, a.no_show_prob, a.reschedule_prob, a.status 
-    FROM appointments a 
-    JOIN users u ON a.patient_id = u.id 
-    JOIN departments d ON a.department_id = d.id 
-    JOIN doctors doc ON a.doctor_id = doc.id 
-    WHERE a.hospital_id = ?
+        SELECT a.id, a.patient_name, a.date 
+        FROM appointments a
+        JOIN users u ON a.user_id = u.id
+        WHERE a.hospital_id = ? AND 
     """
-    args = [hospital_id]
-    if search_query:
-        if search_type == 'name':
-            query += " AND u.name LIKE ?"
-            args.append(f"%{search_query}%")
-        elif search_type == 'email':
-            query += " AND u.email LIKE ?"
-            args.append(f"%{search_query}%")
-        elif search_type == 'department':
-            query += " AND d.name LIKE ?"
-            args.append(f"%{search_query}%")
-        elif search_type == 'doctor':
-            query += " AND doc.name LIKE ?"
-            args.append(f"%{search_query}%")
-    appointments = query_db(query, args)
-    formatted_appointments = [
-        [appt['id'], appt['name'], appt['email'], appt['department_name'], appt['doctor_name'],
-         appt['slot_time'], appt['date'], appt['no_show_prob'], appt['reschedule_prob'], appt['status']]
-        for appt in appointments
-    ]
-    return render_template('hospital_admin.html', appointments=formatted_appointments, search_query=search_query, search_type=search_type)
+    params = [hospital['hospital_id']]
+    if search_type == 'name':
+        query += "a.patient_name LIKE ?"
+        params.append(f"%{search_query}%")
+    elif search_type == 'email':
+        query += "u.email LIKE ?"
+        params.append(f"%{search_query}%")
+    elif search_type == 'department':
+        query += "a.department_id IN (SELECT id FROM departments WHERE name LIKE ?)"
+        params.append(f"%{search_query}%")
+    elif search_type == 'doctor':
+        query += "a.doctor_id IN (SELECT id FROM doctors WHERE name LIKE ?)"
+        params.append(f"%{search_query}%")
+    else:
+        return jsonify([])
+
+    appointments = query_db(query, params)
+    return jsonify(appointments)
 
 @app.route('/hospital_register', methods=['GET', 'POST'])
 @login_required(['super_admin'])
@@ -692,21 +712,23 @@ def hospital_register():
         return redirect(url_for('super_admin_dashboard'))
     return render_template('hospital_register.html')
 
-@app.route('/add_department', methods=['GET', 'POST'])
+@app.route('/hospital_admin')
 @login_required(['hospital_admin'])
-def add_department():
+def hospital_admin():
     user_id = session['user_id']
-    hospital = query_db("SELECT hospital_id FROM users WHERE id = ?", (user_id,), one=True)
-    hospital_id = hospital['hospital_id']
-    if request.method == 'POST':
-        dept_name = request.form['name']
-        query_db(
-            "INSERT INTO departments (hospital_id, name) VALUES (?, ?)",
-            (hospital_id, dept_name), commit=True
-        )
-        flash("Department added successfully.", "success")
-        return redirect(url_for('manage_departments'))
-    return render_template('add_department.html')
+    hospital = query_db("SELECT hospital_id, name FROM hospitals WHERE id = (SELECT hospital_id FROM users WHERE id = ?)", (user_id,), one=True)
+    if not hospital:
+        return redirect(url_for('index'))
+    appointments = query_db("""
+        SELECT a.id, a.patient_name, u.email, d.name as dept_name, doc.name as doc_name, a.time, a.date, a.no_show_prob, a.reschedule_prob, a.status
+        FROM appointments a
+        JOIN users u ON a.user_id = u.id
+        JOIN departments d ON a.department_id = d.id
+        JOIN doctors doc ON a.doctor_id = doc.id
+        WHERE a.hospital_id = ?
+        ORDER BY a.date DESC
+    """, (hospital['hospital_id'],))
+    return render_template('hospital_admin.html', appointments=appointments, hospital_name=hospital['name'])
 
 @app.route('/manage_departments', methods=['GET', 'POST'])
 @login_required(['hospital_admin'])
@@ -715,48 +737,63 @@ def manage_departments():
     hospital = query_db("SELECT hospital_id FROM users WHERE id = ?", (user_id,), one=True)
     hospital_id = hospital['hospital_id']
     
-    if request.method == 'POST' and 'delete_dept' in request.form:
-        dept_id = request.form['dept_id']
-        doctors = query_db("SELECT id FROM doctors WHERE department_id = ?", (dept_id,))
-        appointments = query_db("SELECT id FROM appointments WHERE department_id = ?", (dept_id,))
-        if doctors or appointments:
-            flash("Cannot delete department with existing doctors or appointments.", "danger")
-        else:
+    if request.method == 'POST':
+        if 'delete_dept' in request.form:
+            dept_id = request.form['dept_id']
+            doctors = query_db("SELECT id FROM doctors WHERE department_id = ?", (dept_id,))
+            appointments = query_db("SELECT id FROM appointments WHERE department_id = ?", (dept_id,))
+            if doctors or appointments:
+                return jsonify({'success': False, 'message': 'Cannot delete department with existing doctors or appointments.'})
             query_db("DELETE FROM departments WHERE id = ? AND hospital_id = ?", (dept_id, hospital_id), commit=True)
-            flash("Department deleted successfully.", "success")
-        return redirect(url_for('manage_departments'))
-    
-    if request.method == 'POST' and 'add_doctor' in request.form:
-        dept_id = request.form['dept_id']
-        doctor_name = request.form['doctor_name']
-        doctor_gender = request.form['doctor_gender']
-        start_day = request.form['start_day'].lower()
-        end_day = request.form['end_day'].lower()
-        start_time = request.form['start_time'].lower()
-        end_time = request.form['end_time'].lower()
-        try:
-            start_hour = normalize_schedule_time(start_time)
-            end_hour = normalize_schedule_time(end_time)
-            schedule = f"{start_day}-{end_day} {start_hour}-{end_hour}"
-        except ValueError as e:
-            flash(f"Invalid time format: {e}", "danger")
-            return redirect(url_for('manage_departments'))
-        query_db(
-            "INSERT INTO doctors (hospital_id, department_id, name, gender, schedule) VALUES (?, ?, ?, ?, ?)",
-            (hospital_id, dept_id, doctor_name, doctor_gender, schedule), commit=True
-        )
-        flash("Doctor added successfully.", "success")
-        return redirect(url_for('manage_departments'))
-    
-    if request.method == 'POST' and 'delete_doctor' in request.form:
-        doctor_id = request.form['doctor_id']
-        appointments = query_db("SELECT id FROM appointments WHERE doctor_id = ?", (doctor_id,))
-        if appointments:
-            flash("Cannot delete doctor with existing appointments.", "danger")
-        else:
+            return jsonify({'success': True, 'message': 'Department deleted successfully.'})
+        
+        if 'add_doctor' in request.form:
+            dept_id = request.form['dept_id']
+            doctor_name = request.form['doctor_name']
+            doctor_gender = request.form['doctor_gender']
+            start_day = request.form['start_day'].lower()
+            end_day = request.form['end_day'].lower()
+            start_time = request.form['start_time'].lower()
+            end_time = request.form['end_time'].lower()
+            try:
+                start_hour = normalize_schedule_time(start_time)
+                end_hour = normalize_schedule_time(end_time)
+                schedule = f"{start_day}-{end_day} {start_hour}-{end_hour}"
+            except ValueError as e:
+                return jsonify({'success': False, 'message': f"Invalid time format: {e}"})
+            query_db(
+                "INSERT INTO doctors (hospital_id, department_id, name, gender, schedule) VALUES (?, ?, ?, ?, ?)",
+                (hospital_id, dept_id, doctor_name, doctor_gender, schedule), commit=True
+            )
+            return jsonify({'success': True, 'message': 'Doctor added successfully.'})
+        
+        if 'edit_doctor' in request.form:
+            doctor_id = request.form['doctor_id']
+            doctor_name = request.form['doctor_name']
+            doctor_gender = request.form['doctor_gender']
+            start_day = request.form['start_day'].lower()
+            end_day = request.form['end_day'].lower()
+            start_time = request.form['start_time'].lower()
+            end_time = request.form['end_time'].lower()
+            try:
+                start_hour = normalize_schedule_time(start_time)
+                end_hour = normalize_schedule_time(end_time)
+                schedule = f"{start_day}-{end_day} {start_hour}-{end_hour}"
+            except ValueError as e:
+                return jsonify({'success': False, 'message': f"Invalid time format: {e}"})
+            query_db(
+                "UPDATE doctors SET name = ?, gender = ?, schedule = ? WHERE id = ? AND hospital_id = ?",
+                (doctor_name, doctor_gender, schedule, doctor_id, hospital_id), commit=True
+            )
+            return jsonify({'success': True, 'message': 'Doctor updated successfully.'})
+        
+        if 'delete_doctor' in request.form:
+            doctor_id = request.form['doctor_id']
+            appointments = query_db("SELECT id FROM appointments WHERE doctor_id = ?", (doctor_id,))
+            if appointments:
+                return jsonify({'success': False, 'message': 'Cannot delete doctor with existing appointments.'})
             query_db("DELETE FROM doctors WHERE id = ? AND hospital_id = ?", (doctor_id, hospital_id), commit=True)
-            flash("Doctor deleted successfully.", "success")
-        return redirect(url_for('manage_departments'))
+            return jsonify({'success': True, 'message': 'Doctor deleted successfully.'})
     
     departments = query_db("SELECT id, name FROM departments WHERE hospital_id = ?", (hospital_id,))
     dept_doctors = {}
@@ -821,13 +858,13 @@ def reschedule_patient(appt_id):
     distance = 0 if patient['location'] == hospital_location else 1
     time_of_day = 1 if 'AM' in new_time.upper() else 0
     is_weekday = 0 if appointment_date.weekday() < 5 else 1
-    patient_gender = {'M': 0, 'F': 1, 'Other': 2}[patient['gender']]
-    marriage_status = {'Single': 0, 'Married': 1, 'Divorced': 2, 'Widowed': 3}[patient['marriage_status']]
-    has_occupation = 1 if patient['occupation'].strip() else 0
+    patient_gender = {'M': 0, 'F': 1, 'Other': 2}.get(patient['gender'], 2)
+    marriage_status = {'Single': 0, 'Married': 1, 'Divorced': 2, 'Widowed': 3}.get(patient['marriage_status'], 0)
+    has_occupation = 1 if patient['occupation'] and patient['occupation'].strip() else 0
     doctor_gender = query_db("SELECT gender FROM doctors WHERE id = ?", (appointment['doctor_id'],), one=True)['gender']
     doctor_gender_val = 0 if doctor_gender == 'M' else 1
-    health_challenge = appointment['health_challenge']
-    health_challenge_length = len(health_challenge)
+    health_challenge = appointment['health_challenge'] or ''
+    health_challenge_length = len(health_challenge) if health_challenge else 0
     past_appointments = query_db("SELECT status FROM appointments WHERE patient_id = ? AND date < ?", (user_id, new_date))
     previous_no_shows = sum(1 for appt in past_appointments if appt['status'] == 'no_show')
     features = [previous_no_shows, lead_time, distance, time_of_day, is_weekday, patient['age'], doctor_gender_val,
@@ -887,8 +924,15 @@ def reschedule(appt_id):
     is_weekday = 0 if appointment_date.weekday() < 5 else 1
     doctor_gender = query_db("SELECT gender FROM doctors WHERE id = ?", (appointment['doctor_id'],), one=True)['gender']
     doctor_gender_val = 0 if doctor_gender == 'M' else 1
-    # Use only the features the models expect
-    features = [lead_time, distance, time_of_day, is_weekday, patient['age'], doctor_gender_val]
+    patient_gender = {'M': 0, 'F': 1, 'Other': 2}.get(patient['gender'], 2)
+    marriage_status = {'Single': 0, 'Married': 1, 'Divorced': 2, 'Widowed': 3}.get(patient['marriage_status'], 0)
+    has_occupation = 1 if patient['occupation'] and patient['occupation'].strip() else 0
+    health_challenge = appointment['health_challenge'] or ''
+    health_challenge_length = len(health_challenge) if health_challenge else 0
+    past_appointments = query_db("SELECT status FROM appointments WHERE patient_id = ? AND date < ?", (appointment['patient_id'], new_date))
+    previous_no_shows = sum(1 for appt in past_appointments if appt['status'] == 'no_show')
+    features = [previous_no_shows, lead_time, distance, time_of_day, is_weekday, patient['age'], doctor_gender_val,
+                patient_gender, marriage_status, has_occupation, health_challenge_length]
     no_show_prob = predict_no_show(features)
     reschedule_prob = predict_reschedule(features)
     query = "UPDATE appointments SET date = ?, slot_time = ?, status = 'rescheduled', no_show_prob = ?, reschedule_prob = ? WHERE id = ?"
@@ -925,10 +969,7 @@ def send_reschedule_notification(email, appointment_details):
 
 if __name__ == '__main__':
     init_db()
-    # Retrain models on startup
-    retrain_model()
     scheduler = BackgroundScheduler()
     scheduler.add_job(check_no_shows_and_reschedule, 'cron', hour=8, minute=0)
-    scheduler.add_job(retrain_model, 'cron', day_of_week='sun', hour=2, minute=0)
     scheduler.start()
     app.run(debug=True, use_reloader=False)

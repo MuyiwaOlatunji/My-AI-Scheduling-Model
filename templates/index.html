@@ -3,55 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Patient Appointment System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Healthcare Appointment System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <nav class="navbar">
         <div class="container">
-            <div class="navbar-brand">Patient Appointment System</div>
+            <a href="{{ url_for('index') }}" class="navbar-brand">HealthSync</a>
             <div class="navbar-links">
-                <a href="{{ url_for('index') }}" class="nav-link active">Home</a>
+                <a href="{{ url_for('login') }}" class="nav-link">Patient Login</a>
+                <a href="{{ url_for('super_admin_login') }}" class="nav-link">Super Admin Login</a>
+                <a href="{{ url_for('hospital_admin_login') }}" class="nav-link">Hospital Admin Login</a>
+                <a href="{{ url_for('register') }}" class="nav-link">Register</a>
             </div>
         </div>
     </nav>
+
     <div class="container">
-        <h1>Welcome to the Patient Appointment System</h1>
-        <p class="subtitle">Manage your appointments with ease or administer hospital operations.</p>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+        <h1 class="text-center">Welcome to HealthSync</h1>
+        <p class="subtitle text-center">Manage your healthcare appointments efficiently.</p>
+
         <div class="auth-options">
             <div class="auth-card">
-                <h3><i class="fas fa-user"></i> For Patients</h3>
-                <p>Book and manage your medical appointments.</p>
+                <h3><i class="fas fa-user"></i> Patient</h3>
+                <p>Book, reschedule, or view your appointments.</p>
                 <div class="btn-container">
-                    <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm"><i class="fas fa-user-plus"></i> Register</a>
-                    <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm"><i class="fas fa-sign-in-alt"></i> Login</a>
+                    <a href="{{ url_for('login') }}" class="btn btn-primary">Login</a>
+                    <a href="{{ url_for('register') }}" class="btn btn-secondary">Register</a>
                 </div>
             </div>
             <div class="auth-card">
-                <h3><i class="fas fa-user-shield"></i> For Super Admins</h3>
-                <p>Oversee hospital registrations and subscriptions.</p>
+                <h3><i class="fas fa-hospital"></i> Hospital Admin</h3>
+                <p>Manage departments, doctors, and appointments.</p>
                 <div class="btn-container">
-                    <a href="{{ url_for('super_admin_login') }}" class="btn btn-primary btn-sm"><i class="fas fa-sign-in-alt"></i> Super Admin Login</a>
+                    <a href="{{ url_for('hospital_admin_login') }}" class="btn btn-primary">Login</a>
                 </div>
             </div>
             <div class="auth-card">
-                <h3><i class="fas fa-hospital-user"></i> For Hospital Admins</h3>
-                <p>Manage hospital departments and appointments.</p>
+                <h3><i class="fas fa-shield-alt"></i> Super Admin</h3>
+                <p>Oversee hospitals and subscriptions.</p>
                 <div class="btn-container">
-                    <a href="{{ url_for('hospital_admin_login') }}" class="btn btn-primary btn-sm"><i class="fas fa-sign-in-alt"></i> Hospital Admin Login</a>
-                    <a href="{{ url_for('hospital_register') }}" class="btn btn-secondary btn-sm"><i class="fas fa-hospital"></i> Register Hospital</a>
+                    <a href="{{ url_for('super_admin_login') }}" class="btn btn-primary">Login</a>
                 </div>
             </div>
         </div>
     </div>
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+    <div class="notifications"></div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash-message {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
