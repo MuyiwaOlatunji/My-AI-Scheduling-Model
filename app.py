@@ -203,36 +203,30 @@ def is_doctor_available(doctor_id, date, time_slot):
 # Prediction functions using trained models
 def predict_no_show(features):
     try:
-        rf_model = joblib.load('model/rf_no_show_model.pkl')
-        xgb_model = joblib.load('model/xgb_no_show_model.pkl')
+        model = joblib.load('model/rf_no_show_model.pkl')
         feature_cols = [
             'previous_no_shows', 'lead_time', 'distance', 'time_of_day', 
             'is_weekday', 'age', 'doctor_gender', 'patient_gender', 
             'marriage_status', 'has_occupation', 'health_challenge_length'
         ]
         features_df = pd.DataFrame([features], columns=feature_cols)
-        rf_prob = rf_model.predict_proba(features_df)[0][1]
-        xgb_prob = xgb_model.predict_proba(features_df)[0][1]
-        ensemble_prob = (rf_prob + xgb_prob) / 2 * 100
-        return ensemble_prob
+        prob = model.predict_proba(features_df)[0][1] * 100
+        return prob
     except Exception as e:
         app.logger.error(f"Error predicting no-show: {e}")
         return 10.0
 
 def predict_reschedule(features):
     try:
-        rf_model = joblib.load('model/rf_reschedule_model.pkl')
-        xgb_model = joblib.load('model/xgb_reschedule_model.pkl')
+        model = joblib.load('model/rf_reschedule_model.pkl')
         feature_cols = [
             'previous_no_shows', 'lead_time', 'distance', 'time_of_day', 
             'is_weekday', 'age', 'doctor_gender', 'patient_gender', 
             'marriage_status', 'has_occupation', 'health_challenge_length'
         ]
         features_df = pd.DataFrame([features], columns=feature_cols)
-        rf_prob = rf_model.predict_proba(features_df)[0][1]
-        xgb_prob = xgb_model.predict_proba(features_df)[0][1]
-        ensemble_prob = (rf_prob + xgb_prob) / 2 * 100
-        return ensemble_prob
+        prob = model.predict_proba(features_df)[0][1] * 100
+        return prob
     except Exception as e:
         app.logger.error(f"Error predicting reschedule: {e}")
         return 10.0
@@ -258,6 +252,7 @@ def check_no_shows_and_reschedule():
             # Get patient and appointment details for prediction
             patient = query_db("SELECT * FROM users WHERE id = ?", (appt['patient_id'],), one=True)
             hospital = query_db("SELECT location FROM hospitals WHERE id = ?", (query_db("SELECT hospital_id FROM appointments WHERE id = ?", (appt['id'],), one=True)['hospital_id'],), one=True)
+
             # Prepare features for prediction
             features = [
                 query_db("SELECT COUNT(*) FROM appointments WHERE patient_id = ? AND status = 'no_show'", 
@@ -318,68 +313,6 @@ def check_no_shows_and_reschedule():
                         mail.send(msg)
                         break
 
-# Retrain models with new data
-def retrain_model():
-    with app.app_context():
-        past_appts = query_db("""
-            SELECT a.*, u.age, u.gender AS patient_gender, u.marriage_status, u.occupation, 
-                   h.location, doc.gender AS doctor_gender, a.health_challenge
-            FROM appointments a
-            JOIN users u ON a.patient_id = u.id
-            JOIN hospitals h ON a.hospital_id = h.id
-            JOIN doctors doc ON a.doctor_id = doc.id
-            WHERE a.date < ? AND a.status IN ('attended', 'no-show')
-        """, (date.today().strftime('%Y-%m-%d'),))
-        
-        if not past_appts:
-            app.logger.info("No data available for retraining")
-            return
-        
-        df = pd.DataFrame(past_appts)
-        df['no_show'] = df['status'].apply(lambda x: 1 if x == 'no-show' else 0)
-        df['reschedule'] = df['status'].apply(lambda x: 1 if x == 'rescheduled' else 0)
-        
-        # Prepare features
-        df['previous_no_shows'] = df.apply(lambda row: query_db(
-            "SELECT COUNT(*) FROM appointments WHERE patient_id = ? AND date < ? AND status = 'no-show'",
-            (row['patient_id'], row['date']), one=True)['COUNT(*)'], axis=1)
-        
-        df['lead_time'] = (pd.to_datetime(df['date']) - pd.to_datetime(df['booking_date'])).dt.days
-        df['distance'] = df.apply(lambda row: 0 if row['location'] == query_db(
-            "SELECT location FROM users WHERE id = ?", (row['patient_id'],), one=True)['location'] else 1, axis=1)
-        df['time_of_day'] = df['slot_time'].apply(lambda x: 1 if 'AM' in str(x).upper() else 0)
-        df['is_weekday'] = pd.to_datetime(df['date']).dt.weekday.apply(lambda x: 0 if x < 5 else 1)
-        df['doctor_gender'] = df['doctor_gender'].map({'M': 0, 'F': 1})
-        df['patient_gender'] = df['patient_gender'].map({'M': 0, 'F': 1, 'Other': 2})
-        df['marriage_status'] = df['marriage_status'].map({
-            'Single': 0, 'Married': 1, 'Divorced': 2, 'Widowed': 3
-        })
-        df['has_occupation'] = df['occupation'].apply(lambda x: 1 if x and str(x).strip() else 0)
-        df['health_challenge_length'] = df['health_challenge'].apply(lambda x: len(str(x)) if x else 0)
-        
-        features = [
-            'previous_no_shows', 'lead_time', 'distance', 'time_of_day', 
-            'is_weekday', 'age', 'doctor_gender', 'patient_gender', 
-            'marriage_status', 'has_occupation', 'health_challenge_length'
-        ]
-        X = df[features]
-        y_no_show = df['no_show']
-        y_reschedule = df['reschedule']
-        
-        # Retrain models (simplified - in production you'd use the full training logic)
-        from sklearn.ensemble import RandomForestClassifier
-        from xgboost import XGBClassifier
-        
-        rf_ns = RandomForestClassifier(n_estimators=100, random_state=42)
-        rf_ns.fit(X, y_no_show)
-        joblib.dump(rf_ns, 'model/rf_no_show_model.pkl')
-        
-        xgb_ns = XGBClassifier(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42)
-        xgb_ns.fit(X, y_no_show)
-        joblib.dump(xgb_ns, 'model/xgb_no_show_model.pkl')
-        
-        app.logger.info("Models retrained successfully")
-
 # Routes
 @app.route('/')
 def index():
@@ -433,6 +366,26 @@ def login():
         
         flash("Invalid credentials.", "danger")
     return render_template('login.html')
+
+@app.route('/admin_login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        user = query_db("SELECT * FROM users WHERE email = ? AND role IN ('super_admin', 'hospital_admin')", (email,), one=True)
+        
+        if user and check_password_hash(user['password'], password):
+            session['user_id'] = user['id']
+            session['role'] = user['role']
+            flash("Logged in successfully.", "success")
+            
+            if user['role'] == 'hospital_admin':
+                return redirect(url_for('hospital_admin_dashboard'))
+            else:
+                return redirect(url_for('super_admin_dashboard'))
+        
+        flash("Invalid credentials or not an admin.", "danger")
+    return render_template('admin_login.html')
 
 @app.route('/patient')
 @login_required(['patient'])
@@ -759,7 +712,6 @@ if __name__ == '__main__':
     # Schedule background tasks
     scheduler = BackgroundScheduler()
     scheduler.add_job(check_no_shows_and_reschedule, 'cron', hour=8)
-    scheduler.add_job(retrain_model, 'cron', day_of_week='sun', hour=2)
     scheduler.start()
     
     app.run(debug=True, use_reloader=False)
