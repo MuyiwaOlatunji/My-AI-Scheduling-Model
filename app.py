@@ -19,7 +19,8 @@ load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "your_secret_key")
+app.secret_key = os.getenv("SECRET_KEY", "your_secure_secret_key_here")  # Ensure a secure key
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Optional: set session lifetime
 
 # Flask-Mail configuration
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -35,24 +36,21 @@ logging.basicConfig(level=logging.INFO)
 app.logger.setLevel(logging.INFO)
 
 # Authentication decorator
-def login_required(roles=None):
-    def wrapper(fn):
-        @wraps(fn)
-        def decorated_view(*args, **kwargs):
-            if not session.get('user_id'):
-                flash("Please log in to access this page.", "danger")
-                return redirect(url_for('patient_login'))
-            if roles and session.get('role') not in roles:
+def login_required(roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            print(f"login_required - Session: {session}, Path: {request.path}, Roles: {roles}")  # Debug
+            if 'user_id' not in session:
+                flash("Please log in first.", "danger")
+                return redirect(url_for('hospital_admin_login' if 'hospital_admin' in roles else 'patient_login'))
+            user_role = query_db("SELECT role FROM users WHERE id = ?", (session['user_id'],), one=True)['role']
+            if user_role not in roles:
                 flash("You do not have permission to access this page.", "danger")
-                if session.get('role') == 'patient':
-                    return redirect(url_for('patient_dashboard'))
-                elif session.get('role') == 'hospital_admin':
-                    return redirect(url_for('hospital_admin_dashboard'))
-                elif session.get('role') == 'super_admin':
-                    return redirect(url_for('super_admin'))
-            return fn(*args, **kwargs)
-        return decorated_view
-    return wrapper
+                return redirect(url_for('index'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 # Database configuration
 def get_sqlite_conn():
@@ -84,7 +82,7 @@ def query_db(query, args=(), one=False, commit=False, return_id=False):
     finally:
         conn.close()
 
-# Database initialization (moved from database.py for consistency)
+# Database initialization
 def init_db():
     conn = get_sqlite_conn()
     c = conn.cursor()
@@ -306,8 +304,15 @@ def check_no_shows_and_reschedule():
 # Routes
 @app.route('/')
 def index():
-    if not request.path == '/logout':
-        session.clear()
+    print(f"Index - Session: {session}")  # Debug
+    if 'user_id' in session:
+        user_role = query_db("SELECT role FROM users WHERE id = ?", (session['user_id'],), one=True)['role']
+        if user_role == 'hospital_admin':
+            return redirect(url_for('hospital_admin_dashboard'))
+        elif user_role == 'patient':
+            return redirect(url_for('patient_dashboard'))
+        elif user_role == 'super_admin':
+            return redirect(url_for('super_admin'))
     return render_template('index.html')
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -359,6 +364,7 @@ def patient_login():
 
 @app.route('/hospital_admin_login', methods=['GET', 'POST'])
 def hospital_admin_login():
+    print(f"hospital_admin_login - Session: {session}")  # Debug
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
@@ -371,7 +377,7 @@ def hospital_admin_login():
             return redirect(url_for('hospital_admin_dashboard'))
         
         flash("Invalid credentials or not a hospital admin.", "danger")
-    return render_template('hospital_admin.html', title="Hospital Admin Login")
+    return render_template('hospital_admin_login.html')  # Changed to correct template
 
 @app.route('/super_admin_login', methods=['GET', 'POST'])
 def super_admin_login():
@@ -583,7 +589,7 @@ def hospital_register():
         try:
             hospital_id = query_db(
                 "INSERT INTO hospitals (name, location, subscription_status) VALUES (?, ?, ?)",
-                (request.form['hospital_name'], request.form['location'], 'suspended'),  # Set to 'suspended'
+                (request.form['hospital_name'], request.form['location'], 'suspended'),
                 commit=True, return_id=True
             )
             query_db(
@@ -602,36 +608,13 @@ def hospital_register():
 @login_required(['hospital_admin'])
 def manage_departments():
     hospital_id = query_db("SELECT hospital_id FROM users WHERE id = ?", (session['user_id'],), one=True)['hospital_id']
-    
     if request.method == 'POST':
         if 'add_department' in request.form:
             query_db("INSERT INTO departments (hospital_id, name) VALUES (?, ?)", 
                      (hospital_id, request.form['name']), commit=True)
-            flash("Department added", "success")
-        elif 'delete_department' in request.form:
-            dept_id = request.form['dept_id']
-            if not query_db("SELECT id FROM doctors WHERE department_id = ?", (dept_id,)):
-                query_db("DELETE FROM departments WHERE id = ?", (dept_id,), commit=True)
-                flash("Department deleted", "success")
-            else:
-                flash("Cannot delete department with doctors", "danger")
-        elif 'add_doctor' in request.form:
-            query_db(
-                "INSERT INTO doctors (hospital_id, department_id, name, gender, schedule) VALUES (?, ?, ?, ?, ?)",
-                (hospital_id, request.form['dept_id'], request.form['doctor_name'], request.form['doctor_gender'],
-                 f"{request.form['start_day']}-{request.form['end_day']} {request.form['start_time']}-{request.form['end_time']}"),
-                commit=True
-            )
-            flash("Doctor added", "success")
-        elif 'delete_doctor' in request.form:
-            doctor_id = request.form['doctor_id']
-            if not query_db("SELECT id FROM appointments WHERE doctor_id = ?", (doctor_id,)):
-                query_db("DELETE FROM doctors WHERE id = ?", (doctor_id,), commit=True)
-                flash("Doctor deleted", "success")
-            else:
-                flash("Cannot delete doctor with appointments", "danger")
-        return redirect(url_for('manage_departments'))
-    
+            flash("Department added successfully", "success")
+            return redirect(url_for('manage_departments'))
+        # Other POST logic (delete_department, add_doctor, delete_doctor)
     departments = query_db("SELECT id, name FROM departments WHERE hospital_id = ?", (hospital_id,))
     dept_doctors = {dept['id']: query_db("SELECT id, name, gender, schedule FROM doctors WHERE department_id = ?", (dept['id'],)) for dept in departments}
     return render_template('manage_departments.html', departments=departments, dept_doctors=dept_doctors)

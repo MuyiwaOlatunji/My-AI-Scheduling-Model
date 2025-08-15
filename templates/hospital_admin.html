@@ -26,8 +26,22 @@
             {% endif %}
         {% endwith %}
         <h2>Manage Departments and Doctors</h2>
-        <a href="{{ url_for('add_department') }}" class="btn btn-primary">Add Department</a>
-        <a href="{{ url_for('manage_departments') }}" class="btn btn-primary">Manage Departments</a>
+        <div class="btn-container">
+            <a href="{{ url_for('manage_departments') }}" class="btn btn-primary">Manage Departments</a>
+            <button id="addDepartmentBtn" class="btn btn-primary">Add Department</button>
+        </div>
+        <div id="addDepartmentCard" class="form-container" style="display: none; margin-top: 1rem;">
+            <form id="addDepartmentForm" method="POST" action="{{ url_for('manage_departments') }}">
+                <h3>Add New Department</h3>
+                <div class="form-group">
+                    <label for="deptName" class="form-label">Department Name</label>
+                    <input type="text" id="deptName" name="name" class="form-control" required>
+                    <input type="hidden" name="add_department" value="1">
+                </div>
+                <button type="submit" class="btn btn-success">Save</button>
+                <button type="button" id="cancelDeptBtn" class="btn btn-danger">Cancel</button>
+            </form>
+        </div>
         <h2>Appointments</h2>
         <div class="search-container">
             <form method="GET">

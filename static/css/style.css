@@ -416,9 +416,12 @@ p a:hover {
         font-size: 0.85rem;
         padding: 0.5rem;
     }
-    .form-container {
-        padding: 1rem;
-    }
+.form-container {
+    background-color: #FFFFFF;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+}
     .search-container .form-control {
         width: 100%;
     }

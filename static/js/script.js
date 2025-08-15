@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const data = await response.json();
             departmentSelect.innerHTML = '<option value="" disabled selected>Select a department</option>';
             data.forEach(dept => {
-                const option = new Option(dept.name, dept.id); // Adjusted to match JSON structure
+                const option = new Option(dept.name, dept.id);
                 departmentSelect.appendChild(option);
             });
             departmentSelect.disabled = false;
@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const data = await response.json();
             doctorSelect.innerHTML = '<option value="" disabled selected>Select a doctor</option>';
             data.forEach(doc => {
-                const option = new Option(doc.name, doc.id); // Adjusted to match JSON structure
+                const option = new Option(doc.name, doc.id);
                 doctorSelect.appendChild(option);
             });
             doctorSelect.disabled = false;
@@ -199,6 +199,98 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         deptDiv.querySelector('.doctors').appendChild(newDoctor);
     };
+
+    // Department and Doctor Management Functions
+    const addDepartmentBtn = document.getElementById('addDepartmentBtn');
+    const addDepartmentCard = document.getElementById('addDepartmentCard');
+    const addDepartmentForm = document.getElementById('addDepartmentForm');
+    const cancelDeptBtn = document.getElementById('cancelDeptBtn');
+    const departmentSelectManage = document.getElementById('departmentSelect');
+    const doctorTable = document.getElementById('doctorTable');
+    const doctorList = document.getElementById('doctorList');
+    const addDoctorCard = document.getElementById('addDoctorCard');
+    const addDoctorForm = document.getElementById('addDoctorForm');
+    const cancelDoctorBtn = document.getElementById('cancelDoctorBtn');
+
+    if (addDepartmentBtn && addDepartmentCard) {
+        addDepartmentBtn.addEventListener('click', function () {
+            addDepartmentCard.style.display = 'block';
+        });
+    }
+
+    if (cancelDeptBtn && addDepartmentCard) {
+        cancelDeptBtn.addEventListener('click', function () {
+            addDepartmentForm.reset();
+            addDepartmentCard.style.display = 'none';
+        });
+    }
+
+    if (addDepartmentForm) {
+        addDepartmentForm.addEventListener('submit', function (e) {
+            // Let the form submit to the server, which will handle the close via redirect
+        });
+    }
+
+    if (departmentSelectManage) {
+        departmentSelectManage.addEventListener('change', loadDoctorsForDepartment);
+    }
+
+    async function loadDoctorsForDepartment() {
+        const deptId = departmentSelectManage.value;
+        if (!deptId) {
+            doctorTable.style.display = 'none';
+            return;
+        }
+        try {
+            const response = await fetch(`/get_doctors/${deptId}`);
+            if (!response.ok) throw new Error('Failed to fetch doctors');
+            const doctors = await response.json();
+            doctorList.innerHTML = '';
+            doctors.forEach(doc => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${doc.name}</td>
+                    <td>${doc.gender}</td>
+                    <td>${doc.schedule}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('manage_departments') }}" style="display:inline;">
+                            <input type="hidden" name="doctor_id" value="${doc.id}">
+                            <button type="submit" name="delete_doctor" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this doctor?')">Delete</button>
+                        </form>
+                    </td>
+                `;
+                doctorList.appendChild(row);
+            });
+            doctorTable.style.display = 'block';
+        } catch (error) {
+            console.error('Error loading doctors:', error);
+            doctorList.innerHTML = '<tr><td colspan="4">Error loading doctors</td></tr>';
+        }
+    }
+
+    if (addDoctorCard) {
+        departmentSelectManage.addEventListener('change', function () {
+            if (departmentSelectManage.value) {
+                addDoctorCard.style.display = 'block';
+                document.getElementById('addDoctorDeptId').value = departmentSelectManage.value;
+            } else {
+                addDoctorCard.style.display = 'none';
+            }
+        });
+    }
+
+    if (cancelDoctorBtn && addDoctorCard) {
+        cancelDoctorBtn.addEventListener('click', function () {
+            addDoctorForm.reset();
+            addDoctorCard.style.display = 'none';
+        });
+    }
+
+    if (addDoctorForm) {
+        addDoctorForm.addEventListener('submit', function (e) {
+            // Let the form submit to the server, which will handle the close via redirect
+        });
+    }
 
     // Alert Fading
     const alerts = document.querySelectorAll('.alert');
