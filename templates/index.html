@@ -29,6 +29,7 @@
                 <h3><i class="fas fa-user"></i> Patient</h3>
                 <p>Book, reschedule, or view your appointments.</p>
                 <div class="btn-container">
+<<<<<<< HEAD
                     <a href="{{ url_for('login') }}" class="btn btn-primary">Login</a>
                     <a href="{{ url_for('register') }}" class="btn btn-secondary">Register</a>
                 </div>
@@ -38,13 +39,31 @@
                 <p>Manage departments, doctors, and appointments.</p>
                 <div class="btn-container">
                     <a href="{{ url_for('hospital_admin_login') }}" class="btn btn-primary">Login</a>
+=======
+                    <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm"><i class="fas fa-user-plus"></i> Register</a>
+                    <a href="{{ url_for('patient_login') }}" class="btn btn-secondary btn-sm"><i class="fas fa-sign-in-alt"></i> Login</a>
                 </div>
             </div>
+                <!-- In your index.html, update the super admin card section -->
+                <div class="auth-card">
+                    <h3><i class="fas fa-user-shield"></i> For Super Admins</h3>
+                    <p>Oversee hospital registrations and subscriptions.</p>
+                    <div class="btn-container">
+                        <a href="{{ url_for('super_admin_login') }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-sign-in-alt"></i> Super Admin Login
+                        </a>
+                    </div>
+>>>>>>> redesign
+                </div>
             <div class="auth-card">
                 <h3><i class="fas fa-shield-alt"></i> Super Admin</h3>
                 <p>Oversee hospitals and subscriptions.</p>
                 <div class="btn-container">
+<<<<<<< HEAD
                     <a href="{{ url_for('super_admin_login') }}" class="btn btn-primary">Login</a>
+=======
+                    <a href="{{ url_for('hospital_admin_login') }}" class="btn btn-primary btn-sm"><i class="fas fa-sign-in-alt"></i> Hospital Admin Login</a>
+>>>>>>> redesign
                 </div>
             </div>
         </div>

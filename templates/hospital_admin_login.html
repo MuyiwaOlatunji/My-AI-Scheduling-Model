@@ -3,15 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<<<<<<< HEAD:templates/login.html
     <title>{{ title }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+=======
+    <title>Hospital Admin Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+>>>>>>> redesign:templates/hospital_admin_login.html
 </head>
 <body>
     <nav class="navbar">
         <div class="container">
             <a href="{{ url_for('index') }}" class="navbar-brand">HealthSync</a>
             <div class="navbar-links">
+<<<<<<< HEAD:templates/login.html
                 <a href="{{ url_for('login') }}" class="nav-link {{ 'active' if title == 'Patient Login' }}">Patient Login</a>
                 <a href="{{ url_for('super_admin_login') }}" class="nav-link {{ 'active' if title == 'Super Admin Login' }}">Super Admin Login</a>
                 <a href="{{ url_for('hospital_admin_login') }}" class="nav-link {{ 'active' if title == 'Hospital Admin Login' }}">Hospital Admin Login</a>
@@ -45,6 +51,34 @@
                 <p class="mt-2">Don't have an account? <a href="{{ url_for('register') }}">Register here</a>.</p>
             {% endif %}
         </div>
+=======
+                <a href="{{ url_for('index') }}" class="nav-link">Home</a>
+                <a href="{{ url_for('patient_login') }}" class="nav-link">Patient Login</a>
+                <a href="{{ url_for('super_admin_login') }}" class="nav-link">Super Admin Login</a>
+            </div>
+        </div>
+    </nav>
+    <div class="container form-container">
+        <h1>Hospital Admin Login</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <form method="POST">
+            <div class="form-group">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" id="email" name="email" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" id="password" name="password" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+>>>>>>> redesign:templates/hospital_admin_login.html
     </div>
 
     <div class="notifications"></div>

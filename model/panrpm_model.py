@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+<<<<<<< HEAD
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
@@ -201,13 +202,26 @@ def train_models():
     joblib.dump(best_rf_rs, 'model/rf_reschedule_model.pkl')
     joblib.dump(best_xgb_rs, 'model/xgb_reschedule_model.pkl')
     print("Models trained and saved!")
+=======
+import joblib
+from sklearn.preprocessing import LabelEncoder
+import sqlite3
+>>>>>>> redesign
 
 def predict_no_show(features):
     try:
         rf_model = joblib.load('model/rf_no_show_model.pkl')
         xgb_model = joblib.load('model/xgb_no_show_model.pkl')
+<<<<<<< HEAD
         feature_cols = ['previous_no_shows', 'lead_time', 'distance', 'time_of_day', 'is_weekday', 'age', 'doctor_gender',
                         'patient_gender', 'marriage_status', 'has_occupation', 'health_challenge_length']
+=======
+        feature_cols = [
+            'previous_no_shows', 'lead_time', 'distance', 'time_of_day', 
+            'is_weekday', 'age', 'doctor_gender', 'patient_gender', 
+            'marriage_status', 'has_occupation', 'health_challenge_length'
+        ]
+>>>>>>> redesign
         features_df = pd.DataFrame([features], columns=feature_cols)
         rf_prob = rf_model.predict_proba(features_df)[0][1]
         xgb_prob = xgb_model.predict_proba(features_df)[0][1]
@@ -221,8 +235,16 @@ def predict_reschedule(features):
     try:
         rf_model = joblib.load('model/rf_reschedule_model.pkl')
         xgb_model = joblib.load('model/xgb_reschedule_model.pkl')
+<<<<<<< HEAD
         feature_cols = ['previous_no_shows', 'lead_time', 'distance', 'time_of_day', 'is_weekday', 'age', 'doctor_gender',
                         'patient_gender', 'marriage_status', 'has_occupation', 'health_challenge_length']
+=======
+        feature_cols = [
+            'previous_no_shows', 'lead_time', 'distance', 'time_of_day', 
+            'is_weekday', 'age', 'doctor_gender', 'patient_gender', 
+            'marriage_status', 'has_occupation', 'health_challenge_length'
+        ]
+>>>>>>> redesign
         features_df = pd.DataFrame([features], columns=feature_cols)
         rf_prob = rf_model.predict_proba(features_df)[0][1]
         xgb_prob = xgb_model.predict_proba(features_df)[0][1]
@@ -230,7 +252,11 @@ def predict_reschedule(features):
         return ensemble_prob
     except Exception as e:
         print(f"Error predicting reschedule: {e}")
+<<<<<<< HEAD
         return 10.0
 
 if __name__ == '__main__':
     train_models()
+=======
+        return 10.0
+>>>>>>> redesign

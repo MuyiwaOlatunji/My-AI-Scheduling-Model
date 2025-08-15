@@ -28,7 +28,42 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
+<<<<<<< HEAD
         <table>
+=======
+        <button id="toggleProfileBtn" class="btn btn-primary btn-icon" title="Update Profile">
+            <i class="fas fa-user-edit"></i> Update Profile
+        </button>
+            {% if user %}
+            <form id="profileForm" method="POST" action="{{ url_for('update_profile') }}" class="form-container" style="display: none;">
+                <div class="form-group">
+                    <label for="occupation" class="form-label">Occupation</label>
+                    <input type="text" id="occupation" name="occupation" class="form-control" 
+                        value="{{ user.occupation if user.occupation else '' }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="location" class="form-label">Location</label>
+                    <input type="text" id="location" name="location" class="form-control" 
+                        value="{{ user.location if user.location else '' }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="age" class="form-label">Age</label>
+                    <input type="number" id="age" name="age" class="form-control" 
+                        value="{{ user.age if user.age else '' }}" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Save Profile</button>
+            </form>
+            {% endif %}
+        <h2>Your Appointments</h2>
+        <p>
+            Sort by:
+            <a href="{{ url_for('patient_dashboard', sort_by='date', sort_order='asc') }}" class="{% if request.args.get('sort_by') == 'date' and request.args.get('sort_order') == 'asc' %}active{% endif %}">Date (Asc)</a>
+            <a href="{{ url_for('patient_dashboard', sort_by='date', sort_order='desc') }}" class="{% if request.args.get('sort_by') == 'date' and request.args.get('sort_order') == 'desc' %}active{% endif %}">Date (Desc)</a>
+            <a href="{{ url_for('patient_dashboard', sort_by='status', sort_order='asc') }}" class="{% if request.args.get('sort_by') == 'status' and request.args.get('sort_order') == 'asc' %}active{% endif %}">Status (Asc)</a>
+            <a href="{{ url_for('patient_dashboard', sort_by='status', sort_order='desc') }}" class="{% if request.args.get('sort_by') == 'status' and request.args.get('sort_order') == 'desc' %}active{% endif %}">Status (Desc)</a>
+        </p>
+        <table class="table table-striped table-hover">
+>>>>>>> redesign
             <thead>
                 <tr>
                     <th>Hospital</th>
