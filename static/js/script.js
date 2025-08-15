@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const data = await response.json();
             departmentSelect.innerHTML = '<option value="" disabled selected>Select a department</option>';
             data.forEach(dept => {
-                const option = new Option(dept[1], dept[0]);
+                const option = new Option(dept.name, dept.id); // Adjusted to match JSON structure
                 departmentSelect.appendChild(option);
             });
             departmentSelect.disabled = false;
@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const data = await response.json();
             doctorSelect.innerHTML = '<option value="" disabled selected>Select a doctor</option>';
             data.forEach(doc => {
-                const option = new Option(doc[1], doc[0]);
+                const option = new Option(doc.name, doc.id); // Adjusted to match JSON structure
                 doctorSelect.appendChild(option);
             });
             doctorSelect.disabled = false;
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Hospital Registration Functions
     window.addDepartment = function() {
         const departmentsDiv = document.getElementById('departments');
-        const deptCount = parseInt(departmentsDiv.getAttribute('data-dept-count'));
+        const deptCount = parseInt(departmentsDiv.getAttribute('data-dept-count') || 0);
         const newDeptIndex = deptCount;
         departmentsDiv.setAttribute('data-dept-count', deptCount + 1);
         const firstDept = departmentsDiv.querySelector('.department');
@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     window.addDoctor = function(deptIndex) {
         const deptDiv = document.querySelector(`.department[data-dept-index="${deptIndex}"]`);
-        const doctorCount = parseInt(deptDiv.getAttribute('data-doctor-count'));
+        const doctorCount = parseInt(deptDiv.getAttribute('data-doctor-count') || 0);
         const newDoctorIndex = doctorCount;
         deptDiv.setAttribute('data-doctor-count', doctorCount + 1);
         const firstDoctor = document.querySelector('.department[data-dept-index="0"] .doctor');
@@ -208,4 +208,16 @@ document.addEventListener('DOMContentLoaded', function () {
             setTimeout(() => alert.remove(), 500);
         }, 5000);
     });
+
+    // Password Toggle
+    const togglePassword = document.querySelector('#togglePassword');
+    const password = document.querySelector('#password');
+    if (togglePassword && password) {
+        togglePassword.addEventListener('click', function () {
+            const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+            password.setAttribute('type', type);
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
+    }
 });

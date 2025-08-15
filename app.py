@@ -41,7 +41,7 @@ def login_required(roles=None):
         def decorated_view(*args, **kwargs):
             if not session.get('user_id'):
                 flash("Please log in to access this page.", "danger")
-                return redirect(url_for('login'))
+                return redirect(url_for('patient_login'))
             if roles and session.get('role') not in roles:
                 flash("You do not have permission to access this page.", "danger")
                 if session.get('role') == 'patient':
@@ -49,7 +49,7 @@ def login_required(roles=None):
                 elif session.get('role') == 'hospital_admin':
                     return redirect(url_for('hospital_admin_dashboard'))
                 elif session.get('role') == 'super_admin':
-                    return redirect(url_for('super_admin_dashboard'))
+                    return redirect(url_for('super_admin'))
             return fn(*args, **kwargs)
         return decorated_view
     return wrapper
@@ -84,18 +84,17 @@ def query_db(query, args=(), one=False, commit=False, return_id=False):
     finally:
         conn.close()
 
-# Database initialization
+# Database initialization (moved from database.py for consistency)
 def init_db():
     conn = get_sqlite_conn()
     c = conn.cursor()
-    # Create tables if they don't exist
     c.execute('''CREATE TABLE IF NOT EXISTS hospitals 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, location TEXT, 
                   subscription_status TEXT DEFAULT 'pending', subscription_expiry_date TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS users 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT UNIQUE, phone TEXT, password TEXT, 
-                  role TEXT, age INTEGER, location TEXT, gender TEXT, marriage_status TEXT, occupation TEXT, 
-                  hospital_id INTEGER)''')
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL, 
+                  password TEXT NOT NULL, role TEXT NOT NULL, age INTEGER, location TEXT, 
+                  gender TEXT, marriage_status TEXT, occupation TEXT, hospital_id INTEGER)''')
     c.execute('''CREATE TABLE IF NOT EXISTS departments 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, hospital_id INTEGER, name TEXT,
                   FOREIGN KEY (hospital_id) REFERENCES hospitals(id))''')
@@ -112,26 +111,18 @@ def init_db():
                   FOREIGN KEY (department_id) REFERENCES departments(id),
                   FOREIGN KEY (doctor_id) REFERENCES doctors(id))''')
 
-    # Seed initial data only if no users exist
-    if not query_db("SELECT COUNT(*) FROM users", one=True)['COUNT(*)']:
-        # Seed hospitals with subscription data
+    # Seed initial data only if no super admin exists
+    c.execute("SELECT COUNT(*) FROM users WHERE role = 'super_admin'")
+    if c.fetchone()[0] == 0:
         hospitals = [
             ("Lagos General Hospital", "Lagos", "active", (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d')),
             ("Abuja Medical Center", "Abuja", "active", (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d')),
         ]
         c.executemany("INSERT INTO hospitals (name, location, subscription_status, subscription_expiry_date) VALUES (?, ?, ?, ?)", hospitals)
-        
-        # Seed super admin and patient
-        admin_email = "admin@example.com"
-        admin_password = generate_password_hash("adminpassword")
-        patient_email = "patient@example.com"
-        patient_password = generate_password_hash("patientpassword")
-        c.execute("INSERT INTO users (name, email, phone, password, role, age) VALUES (?, ?, ?, ?, ?, ?)",
-                  ("Super Admin", admin_email, "1234567890", admin_password, "super_admin", 30))
-        c.execute("INSERT INTO users (name, email, phone, password, role, age, location, gender, marriage_status, occupation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                  ("Test Patient", patient_email, "0987654321", patient_password, "patient", 25, "Lagos", "M", "Single", "Engineer"))
-        
-        # Seed sample departments and doctors
+        c.execute("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
+                  ("Admin", "admin@example.com", generate_password_hash("admin123"), "super_admin"))
+        c.execute("INSERT INTO users (name, email, password, role, age, location, gender, marriage_status, occupation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  ("Test Patient", "patient@example.com", generate_password_hash("patient123"), "patient", 25, "Lagos", "M", "Single", "Engineer"))
         c.execute("INSERT INTO departments (hospital_id, name) VALUES (?, ?)", (1, "Cardiology"))
         c.execute("INSERT INTO departments (hospital_id, name) VALUES (?, ?)", (2, "Neurology"))
         c.execute("INSERT INTO doctors (hospital_id, department_id, name, gender, schedule) VALUES (?, ?, ?, ?, ?)",
@@ -161,7 +152,6 @@ def is_doctor_available(doctor_id, date, time_slot):
     doctor = query_db("SELECT schedule FROM doctors WHERE id = ?", (doctor_id,), one=True)
     if not doctor:
         return False
-    
     schedule = doctor['schedule'].lower()
     try:
         match = re.match(r'^([a-z]{3})-([a-z]{3})\s+([\d:apm]+)-([\d:apm]+)$', schedule)
@@ -316,6 +306,8 @@ def check_no_shows_and_reschedule():
 # Routes
 @app.route('/')
 def index():
+    if not request.path == '/logout':
+        session.clear()
     return render_template('index.html')
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -340,64 +332,80 @@ def register():
                 user_data, commit=True
             )
             flash("Registration successful! Please login.", "success")
-            return redirect(url_for('login'))
+            return redirect(url_for('patient_login'))
         except sqlite3.IntegrityError:
             flash("Email already exists.", "danger")
     return render_template('register.html')
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
+@app.route('/patient_login', methods=['GET', 'POST'])
+def patient_login():
     if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-        user = query_db("SELECT * FROM users WHERE email = ?", (email,), one=True)
+        email = request.form.get('email')
+        password = request.form.get('password')
+        if not email or not password:
+            flash('Please provide both email and password', 'danger')
+            return redirect(url_for('patient_login'))
+        
+        user = query_db("SELECT * FROM users WHERE email = ? AND role = 'patient'", (email,), one=True)
         
         if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
             session['role'] = user['role']
-            flash("Logged in successfully.", "success")
-            
-            if user['role'] == 'patient':
-                return redirect(url_for('patient_dashboard'))
-            elif user['role'] == 'hospital_admin':
-                return redirect(url_for('hospital_admin_dashboard'))
-            elif user['role'] == 'super_admin':
-                return redirect(url_for('super_admin_dashboard'))
+            flash('Logged in successfully', 'success')
+            return redirect(url_for('patient_dashboard'))
         
-        flash("Invalid credentials.", "danger")
-    return render_template('login.html')
+        flash('Invalid credentials', 'danger')
+    return render_template('patient_login.html')
 
-@app.route('/admin_login', methods=['GET', 'POST'])
-def admin_login():
+@app.route('/hospital_admin_login', methods=['GET', 'POST'])
+def hospital_admin_login():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
-        user = query_db("SELECT * FROM users WHERE email = ? AND role IN ('super_admin', 'hospital_admin')", (email,), one=True)
+        user = query_db("SELECT * FROM users WHERE email = ? AND role = 'hospital_admin'", (email,), one=True)
         
         if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
             session['role'] = user['role']
             flash("Logged in successfully.", "success")
-            
-            if user['role'] == 'hospital_admin':
-                return redirect(url_for('hospital_admin_dashboard'))
-            else:
-                return redirect(url_for('super_admin_dashboard'))
+            return redirect(url_for('hospital_admin_dashboard'))
         
-        flash("Invalid credentials or not an admin.", "danger")
-    return render_template('admin_login.html')
+        flash("Invalid credentials or not a hospital admin.", "danger")
+    return render_template('hospital_admin.html', title="Hospital Admin Login")
+
+@app.route('/super_admin_login', methods=['GET', 'POST'])
+def super_admin_login():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        if not email or not password:
+            flash('Please provide both email and password', 'danger')
+            return redirect(url_for('super_admin_login'))
+        
+        user = query_db("SELECT * FROM users WHERE email = ? AND role = 'super_admin'", (email,), one=True)
+        
+        if user and check_password_hash(user['password'], password):
+            session['user_id'] = user['id']
+            session['role'] = user['role']
+            flash("Logged in successfully.", "success")
+            return redirect(url_for('super_admin'))
+        
+        flash("Invalid credentials or not a super admin.", "danger")
+        return redirect(url_for('super_admin_login'))
+    
+    return render_template('super_admin_login.html')
 
 @app.route('/patient')
 @login_required(['patient'])
 def patient_dashboard():
     sort_by = request.args.get('sort_by', 'date')
     sort_order = request.args.get('sort_order', 'asc')
-    
     if sort_by not in ['date', 'status']:
         sort_by = 'date'
     if sort_order not in ['asc', 'desc']:
         sort_order = 'asc'
-    
+
+    user = query_db("SELECT * FROM users WHERE id = ?", (session['user_id'],), one=True)
     appointments = query_db(f"""
         SELECT a.id, h.name AS hospital, d.name AS department, doc.name AS doctor, 
                a.date, a.slot_time, a.status, a.no_show_prob, a.reschedule_prob
@@ -408,15 +416,30 @@ def patient_dashboard():
         WHERE a.patient_id = ?
         ORDER BY {sort_by} {sort_order}
     """, (session['user_id'],))
-    
-    return render_template('patient.html', appointments=appointments)
+
+    return render_template('patient.html', appointments=appointments, user=user)
+
+@app.route('/update_profile', methods=['POST'])
+@login_required(['patient'])
+def update_profile():
+    if request.method == 'POST':
+        try:
+            query_db(
+                "UPDATE users SET occupation = ?, location = ?, age = ? WHERE id = ?",
+                (request.form['occupation'], request.form['location'], int(request.form['age']), session['user_id']),
+                commit=True
+            )
+            flash("Profile updated successfully", "success")
+        except Exception as e:
+            app.logger.error(f"Error updating profile: {e}")
+            flash("Error updating profile", "danger")
+    return redirect(url_for('patient_dashboard'))
 
 @app.route('/book', methods=['GET', 'POST'])
 @login_required(['patient'])
 def book_appointment():
     if request.method == 'POST':
         try:
-            # Get form data
             hospital_id = request.form['hospital']
             department_id = request.form['department']
             doctor_id = request.form['doctor']
@@ -424,53 +447,45 @@ def book_appointment():
             slot_time = request.form['time']
             health_challenge = request.form['health_challenge']
             
-            # Validate doctor availability
             if not is_doctor_available(doctor_id, date_str, slot_time):
                 flash("Selected slot is not available", "danger")
                 return redirect(url_for('book_appointment'))
             
-            # Get patient and hospital data for prediction
             patient = query_db("SELECT * FROM users WHERE id = ?", (session['user_id'],), one=True)
             hospital = query_db("SELECT location FROM hospitals WHERE id = ?", (hospital_id,), one=True)
             
-            # Prepare features for prediction
             appointment_date = datetime.strptime(date_str, '%Y-%m-%d')
             booking_date = datetime.now()
             lead_time = (appointment_date - booking_date).days
             
             features = [
                 query_db("SELECT COUNT(*) FROM appointments WHERE patient_id = ? AND status = 'no-show'", 
-                        (session['user_id'],), one=True)['COUNT(*)'],  # previous_no_shows
+                        (session['user_id'],), one=True)['COUNT(*)'],
                 lead_time,
-                0 if patient['location'] == hospital['location'] else 1,  # distance
-                1 if 'AM' in slot_time.upper() else 0,  # time_of_day
-                0 if appointment_date.weekday() < 5 else 1,  # is_weekday
-                patient['age'],  # age
-                0 if query_db("SELECT gender FROM doctors WHERE id = ?", (doctor_id,), one=True)['gender'] == 'M' else 1,  # doctor_gender
-                {'M': 0, 'F': 1, 'Other': 2}[patient['gender']],  # patient_gender
-                {'Single': 0, 'Married': 1, 'Divorced': 2, 'Widowed': 3}[patient['marriage_status']],  # marriage_status
-                1 if patient['occupation'].strip() else 0,  # has_occupation
-                len(health_challenge)  # health_challenge_length
+                0 if patient['location'] == hospital['location'] else 1,
+                1 if 'AM' in slot_time.upper() else 0,
+                0 if appointment_date.weekday() < 5 else 1,
+                patient['age'],
+                0 if query_db("SELECT gender FROM doctors WHERE id = ?", (doctor_id,), one=True)['gender'] == 'M' else 1,
+                {'M': 0, 'F': 1, 'Other': 2}[patient['gender']],
+                {'Single': 0, 'Married': 1, 'Divorced': 2, 'Widowed': 3}[patient['marriage_status']],
+                1 if patient['occupation'].strip() else 0,
+                len(health_challenge)
             ]
             
-            # Make predictions
             no_show_prob = predict_no_show(features)
             reschedule_prob = predict_reschedule(features)
             
-            # Create appointment
             query_db("""
-                INSERT INTO appointments 
-                (patient_id, hospital_id, department_id, doctor_id, slot_time, date, booking_date, 
-                 no_show_prob, reschedule_prob, status, health_challenge)
+                INSERT INTO appointments (patient_id, hospital_id, department_id, doctor_id, slot_time, date, 
+                booking_date, no_show_prob, reschedule_prob, status, health_challenge)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                session['user_id'], hospital_id, department_id, doctor_id, slot_time, date_str, 
-                booking_date.strftime('%Y-%m-%d'), no_show_prob, reschedule_prob, 'scheduled', health_challenge
-            ), commit=True)
+            """, (session['user_id'], hospital_id, department_id, doctor_id, slot_time, date_str,
+                  booking_date.strftime('%Y-%m-%d'), no_show_prob, reschedule_prob, 'scheduled', health_challenge),
+                commit=True)
             
             flash("Appointment booked successfully!", "success")
             return redirect(url_for('patient_dashboard'))
-            
         except Exception as e:
             app.logger.error(f"Error booking appointment: {e}")
             flash("Error booking appointment", "danger")
@@ -510,7 +525,7 @@ def get_available_slots():
 
 @app.route('/super_admin')
 @login_required(['super_admin'])
-def super_admin_dashboard():
+def super_admin():
     search = request.args.get('search', '')
     query = """
     SELECT h.*, 
@@ -524,6 +539,8 @@ def super_admin_dashboard():
         args.extend([f"%{search}%", f"%{search}%"])
     
     hospitals = query_db(query, args)
+    for h in hospitals:
+        print(f"Hospital ID: {h['id']}, Status: {h['subscription_status']}")  # Debug print
     return render_template('super_admin.html', hospitals=hospitals, search=search)
 
 @app.route('/hospital_admin')
@@ -564,31 +581,21 @@ def hospital_admin_dashboard():
 def hospital_register():
     if request.method == 'POST':
         try:
-            # Create hospital
             hospital_id = query_db(
-                "INSERT INTO hospitals (name, location) VALUES (?, ?)",
-                (request.form['hospital_name'], request.form['location']),
+                "INSERT INTO hospitals (name, location, subscription_status) VALUES (?, ?, ?)",
+                (request.form['hospital_name'], request.form['location'], 'suspended'),  # Set to 'suspended'
                 commit=True, return_id=True
             )
-            
-            # Create admin user
             query_db(
                 "INSERT INTO users (name, email, password, role, hospital_id) VALUES (?, ?, ?, ?, ?)",
-                (
-                    request.form['admin_name'],
-                    request.form['admin_email'],
-                    generate_password_hash(request.form['admin_password']),
-                    'hospital_admin',
-                    hospital_id
-                ),
+                (request.form['admin_name'], request.form['admin_email'], 
+                 generate_password_hash(request.form['admin_password']), 'hospital_admin', hospital_id),
                 commit=True
             )
-            
-            flash("Hospital registered successfully", "success")
-            return redirect(url_for('super_admin_dashboard'))
+            flash("Hospital registered successfully and set to suspended status.", "success")
+            return redirect(url_for('super_admin'))
         except Exception as e:
             flash(f"Error registering hospital: {str(e)}", "danger")
-    
     return render_template('hospital_register.html')
 
 @app.route('/manage_departments', methods=['GET', 'POST'])
@@ -598,11 +605,8 @@ def manage_departments():
     
     if request.method == 'POST':
         if 'add_department' in request.form:
-            query_db(
-                "INSERT INTO departments (hospital_id, name) VALUES (?, ?)",
-                (hospital_id, request.form['name']),
-                commit=True
-            )
+            query_db("INSERT INTO departments (hospital_id, name) VALUES (?, ?)", 
+                     (hospital_id, request.form['name']), commit=True)
             flash("Department added", "success")
         elif 'delete_department' in request.form:
             dept_id = request.form['dept_id']
@@ -614,13 +618,8 @@ def manage_departments():
         elif 'add_doctor' in request.form:
             query_db(
                 "INSERT INTO doctors (hospital_id, department_id, name, gender, schedule) VALUES (?, ?, ?, ?, ?)",
-                (
-                    hospital_id,
-                    request.form['dept_id'],
-                    request.form['doctor_name'],
-                    request.form['doctor_gender'],
-                    f"{request.form['start_day']}-{request.form['end_day']} {request.form['start_time']}-{request.form['end_time']}"
-                ),
+                (hospital_id, request.form['dept_id'], request.form['doctor_name'], request.form['doctor_gender'],
+                 f"{request.form['start_day']}-{request.form['end_day']} {request.form['start_time']}-{request.form['end_time']}"),
                 commit=True
             )
             flash("Doctor added", "success")
@@ -631,39 +630,42 @@ def manage_departments():
                 flash("Doctor deleted", "success")
             else:
                 flash("Cannot delete doctor with appointments", "danger")
-        
         return redirect(url_for('manage_departments'))
     
     departments = query_db("SELECT id, name FROM departments WHERE hospital_id = ?", (hospital_id,))
-    dept_doctors = {}
-    for dept in departments:
-        dept_doctors[dept['id']] = query_db(
-            "SELECT id, name, gender, schedule FROM doctors WHERE department_id = ?", 
-            (dept['id'],)
-        )
-    
+    dept_doctors = {dept['id']: query_db("SELECT id, name, gender, schedule FROM doctors WHERE department_id = ?", (dept['id'],)) for dept in departments}
     return render_template('manage_departments.html', departments=departments, dept_doctors=dept_doctors)
 
 @app.route('/suspend_hospital/<int:hospital_id>', methods=['POST'])
 @login_required(['super_admin'])
 def suspend_hospital(hospital_id):
-    query_db(
-        "UPDATE hospitals SET subscription_status = 'suspended' WHERE id = ?",
-        (hospital_id,), commit=True
-    )
+    query_db("UPDATE hospitals SET subscription_status = 'suspended' WHERE id = ?", (hospital_id,), commit=True)
     flash("Hospital suspended", "success")
-    return redirect(url_for('super_admin_dashboard'))
+    return redirect(url_for('super_admin'))
 
 @app.route('/activate_hospital/<int:hospital_id>', methods=['POST'])
 @login_required(['super_admin'])
 def activate_hospital(hospital_id):
     expiry_date = (datetime.now() + timedelta(days=365)).strftime('%Y-%m-%d')
-    query_db(
-        "UPDATE hospitals SET subscription_status = 'active', subscription_expiry_date = ? WHERE id = ?",
-        (expiry_date, hospital_id), commit=True
-    )
+    query_db("UPDATE hospitals SET subscription_status = 'active', subscription_expiry_date = ? WHERE id = ?", 
+             (expiry_date, hospital_id), commit=True)
     flash("Hospital activated", "success")
-    return redirect(url_for('super_admin_dashboard'))
+    return redirect(url_for('super_admin'))
+
+@app.route('/delete_hospital/<int:hospital_id>', methods=['POST'])
+@login_required(['super_admin'])
+def delete_hospital(hospital_id):
+    has_users = query_db("SELECT COUNT(*) as count FROM users WHERE hospital_id = ?", (hospital_id,), one=True)['count'] > 0
+    has_departments = query_db("SELECT COUNT(*) as count FROM departments WHERE hospital_id = ?", (hospital_id,), one=True)['count'] > 0
+    has_doctors = query_db("SELECT COUNT(*) as count FROM doctors WHERE hospital_id = ?", (hospital_id,), one=True)['count'] > 0
+    has_appointments = query_db("SELECT COUNT(*) as count FROM appointments WHERE hospital_id = ?", (hospital_id,), one=True)['count'] > 0
+
+    if has_users or has_departments or has_doctors or has_appointments:
+        flash("Cannot delete hospital with associated users, departments, doctors, or appointments.", "danger")
+    else:
+        query_db("DELETE FROM hospitals WHERE id = ?", (hospital_id,), commit=True)
+        flash("Hospital deleted successfully.", "success")
+    return redirect(url_for('super_admin'))
 
 @app.route('/reschedule_patient/<int:appt_id>', methods=['POST'])
 @login_required(['patient'])
@@ -681,22 +683,15 @@ def reschedule_patient(appt_id):
         flash("Slot not available", "danger")
         return redirect(url_for('patient_dashboard'))
     
-    # Update appointment
-    query_db(
-        "UPDATE appointments SET date = ?, slot_time = ?, status = 'rescheduled' WHERE id = ?",
-        (new_date, new_time, appt_id), commit=True
-    )
-    
+    query_db("UPDATE appointments SET date = ?, slot_time = ?, status = 'rescheduled' WHERE id = ?", 
+             (new_date, new_time, appt_id), commit=True)
     flash("Appointment rescheduled", "success")
     return redirect(url_for('patient_dashboard'))
 
 @app.route('/mark_attended/<int:appt_id>', methods=['POST'])
 @login_required(['hospital_admin'])
 def mark_attended(appt_id):
-    query_db(
-        "UPDATE appointments SET status = 'attended' WHERE id = ?",
-        (appt_id,), commit=True
-    )
+    query_db("UPDATE appointments SET status = 'attended' WHERE id = ?", (appt_id,), commit=True)
     flash("Appointment marked as attended", "success")
     return redirect(url_for('hospital_admin_dashboard'))
 
@@ -708,10 +703,7 @@ def logout():
 
 if __name__ == '__main__':
     init_db()
-    
-    # Schedule background tasks
     scheduler = BackgroundScheduler()
     scheduler.add_job(check_no_shows_and_reschedule, 'cron', hour=8)
     scheduler.start()
-    
     app.run(debug=True, use_reloader=False)

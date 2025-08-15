@@ -32,16 +32,19 @@
                 <p>Book and manage your medical appointments.</p>
                 <div class="btn-container">
                     <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm"><i class="fas fa-user-plus"></i> Register</a>
-                    <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm"><i class="fas fa-sign-in-alt"></i> Login</a>
+                    <a href="{{ url_for('patient_login') }}" class="btn btn-secondary btn-sm"><i class="fas fa-sign-in-alt"></i> Login</a>
                 </div>
             </div>
-            <div class="auth-card">
-                <h3><i class="fas fa-user-shield"></i> For Super Admins</h3>
-                <p>Oversee hospital registrations and subscriptions.</p>
-                <div class="btn-container">
-                    <a href="{{ url_for('super_admin_login') }}" class="btn btn-primary btn-sm"><i class="fas fa-sign-in-alt"></i> Super Admin Login</a>
+                <!-- In your index.html, update the super admin card section -->
+                <div class="auth-card">
+                    <h3><i class="fas fa-user-shield"></i> For Super Admins</h3>
+                    <p>Oversee hospital registrations and subscriptions.</p>
+                    <div class="btn-container">
+                        <a href="{{ url_for('super_admin_login') }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-sign-in-alt"></i> Super Admin Login
+                        </a>
+                    </div>
                 </div>
-            </div>
             <div class="auth-card">
                 <h3><i class="fas fa-hospital-user"></i> For Hospital Admins</h3>
                 <p>Manage hospital departments and appointments.</p>

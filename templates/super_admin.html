@@ -11,7 +11,7 @@
         <div class="container">
             <div class="navbar-brand">Patient Appointment System</div>
             <div class="navbar-links">
-                <a href="{{ url_for('index') }}" class="nav-link">Home</a>
+                <a href="{{ url_for('hospital_register') }}" class="nav-link">Register Hospital</a>
                 <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
             </div>
         </div>
@@ -25,51 +25,43 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        <a href="{{ url_for('hospital_register') }}" class="btn btn-primary">Register New Hospital</a>
-        <div class="search-container">
-            <form method="GET">
-                <input type="text" name="search" value="{{ search_query }}" class="form-control" placeholder="Search hospitals...">
-                <button type="submit" class="btn btn-primary">Search</button>
-            </form>
-        </div>
-        <table class="table table-striped table-hover">
+        <form method="GET" action="{{ url_for('super_admin') }}" class="search-form">
+            <input type="text" name="search" value="{{ search }}" placeholder="Search by name or location" class="form-control">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+        <table class="table">
             <thead>
                 <tr>
-                    <th>ID</th>
                     <th>Name</th>
                     <th>Location</th>
                     <th>Subscription Status</th>
                     <th>Expiry Date</th>
                     <th>Departments</th>
                     <th>Doctors</th>
-                    <th>Appointments</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for hospital in hospitals %}
                     <tr>
-                        <td>{{ hospital.id }}</td>
                         <td>{{ hospital.name }}</td>
                         <td>{{ hospital.location }}</td>
                         <td>{{ hospital.subscription_status }}</td>
                         <td>{{ hospital.subscription_expiry_date }}</td>
                         <td>{{ hospital.dept_count }}</td>
                         <td>{{ hospital.doc_count }}</td>
-                        <td>{{ hospital.appt_count }}</td>
-                        <td class="btn-container">
-                            {% if hospital.subscription_status != 'active' %}
+                        <td>
+                            {% if hospital.subscription_status == 'suspended' %}
                                 <form action="{{ url_for('activate_hospital', hospital_id=hospital.id) }}" method="POST" style="display:inline;">
-                                    <button type="submit" class="btn btn-sm btn-success">Activate</button>
+                                    <button type="submit" class="btn btn-success btn-sm">Activate</button>
                                 </form>
-                            {% endif %}
-                            {% if hospital.subscription_status != 'suspended' %}
+                            {% elif hospital.subscription_status == 'active' %}
                                 <form action="{{ url_for('suspend_hospital', hospital_id=hospital.id) }}" method="POST" style="display:inline;">
-                                    <button type="submit" class="btn btn-sm btn-warning">Suspend</button>
+                                    <button type="submit" class="btn btn-warning btn-sm">Suspend</button>
                                 </form>
                             {% endif %}
                             <form action="{{ url_for('delete_hospital', hospital_id=hospital.id) }}" method="POST" style="display:inline;">
-                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this hospital? This action cannot be undone.')">Delete</button>
                             </form>
                         </td>
                     </tr>
@@ -77,6 +69,5 @@
             </tbody>
         </table>
     </div>
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>

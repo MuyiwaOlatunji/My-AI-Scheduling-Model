@@ -435,3 +435,116 @@ p a:hover {
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+/* Login Container */
+.login-container {
+    max-width: 450px;
+    margin: 5rem auto;
+    padding: 2.5rem;
+    background: #FFFFFF;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.login-header h1 {
+    color: #7C3AED;
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.login-header p {
+    color: #6B7280;
+    font-size: 0.95rem;
+}
+
+/* Login Form */
+.login-form {
+    margin-top: 1.5rem;
+}
+
+.login-form .form-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #4B5563;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.login-form .form-label i {
+    color: #7C3AED;
+    font-size: 0.9rem;
+}
+
+.login-form .form-control {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid #E5E7EB;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+}
+
+.login-form .form-control:focus {
+    border-color: #7C3AED;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
+}
+
+.login-form .form-control::placeholder {
+    color: #9CA3AF;
+}
+
+/* Form Footer */
+.form-footer {
+    margin-top: 2rem;
+}
+
+.btn-block {
+    display: block;
+    width: 100%;
+    padding: 0.8rem;
+    font-size: 1rem;
+    border-radius: 8px;
+}
+
+.login-links {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1.5rem;
+    font-size: 0.85rem;
+}
+
+.login-links a {
+    color: #6B7280;
+    text-decoration: none;
+    transition: color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.login-links a:hover {
+    color: #7C3AED;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 576px) {
+    .login-container {
+        margin: 2rem auto;
+        padding: 1.5rem;
+    }
+    
+    .login-header h1 {
+        font-size: 1.75rem;
+    }
+    
+    .login-links {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: center;
+    }
+}

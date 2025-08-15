@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="navbar-brand">Patient Appointment System</div>
+            <div class="navbar-links">
+                <a href="{{ url_for('index') }}" class="nav-link active">Home</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="login-container">
+        <div class="login-header">
+            <h1>Patient Login</h1>
+            <p>Welcome back! Please enter your credentials</p>
+        </div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <form method="POST" action="{{ url_for('patient_login') }}" class="login-form">
+            <div class="form-group">
+                <label for="email" class="form-label">
+                    <i class="fas fa-envelope"></i> Email Address
+                </label>
+                <input type="email" id="email" name="email" class="form-control" placeholder="Enter your email" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password" class="form-label">
+                    <i class="fas fa-lock"></i> Password
+                </label>
+                <input type="password" id="password" name="password" class="form-control" placeholder="Enter your password" required>
+            </div>
+            
+            <div class="form-footer">
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-sign-in-alt"></i> Login
+                </button>
+                
+                <div class="login-links">
+                    <a href="{{ url_for('register') }}" class="register-link">
+                        <i class="fas fa-user-plus"></i> Create an account
+                    </a>
+                    <a href="#" class="forgot-password">
+                        <i class="fas fa-question-circle"></i> Forgot password?
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

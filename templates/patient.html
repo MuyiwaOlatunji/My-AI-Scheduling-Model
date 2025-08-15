@@ -29,21 +29,26 @@
         <button id="toggleProfileBtn" class="btn btn-primary btn-icon" title="Update Profile">
             <i class="fas fa-user-edit"></i> Update Profile
         </button>
-        <form id="profileForm" method="POST" action="{{ url_for('update_profile') }}" class="form-container">
-            <div class="form-group">
-                <label for="occupation" class="form-label">Occupation</label>
-                <input type="text" id="occupation" name="occupation" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="location" class="form-label">Location</label>
-                <input type="text" id="location" name="location" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="age" class="form-label">Age</label>
-                <input type="number" id="age" name="age" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-primary btn-sm">Save Profile</button>
-        </form>
+            {% if user %}
+            <form id="profileForm" method="POST" action="{{ url_for('update_profile') }}" class="form-container" style="display: none;">
+                <div class="form-group">
+                    <label for="occupation" class="form-label">Occupation</label>
+                    <input type="text" id="occupation" name="occupation" class="form-control" 
+                        value="{{ user.occupation if user.occupation else '' }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="location" class="form-label">Location</label>
+                    <input type="text" id="location" name="location" class="form-control" 
+                        value="{{ user.location if user.location else '' }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="age" class="form-label">Age</label>
+                    <input type="number" id="age" name="age" class="form-control" 
+                        value="{{ user.age if user.age else '' }}" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Save Profile</button>
+            </form>
+            {% endif %}
         <h2>Your Appointments</h2>
         <p>
             Sort by:
