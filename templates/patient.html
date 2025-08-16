@@ -26,11 +26,13 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        <button id="toggleProfileBtn" class="btn btn-primary btn-icon" title="Update Profile">
+        
+        <button id="toggleProfileBtn" class="btn btn-primary">
             <i class="fas fa-user-edit"></i> Update Profile
         </button>
-            {% if user %}
-            <form id="profileForm" method="POST" action="{{ url_for('update_profile') }}" class="form-container" style="display: none;">
+        
+        <div id="profileForm" class="form-container" style="display: none; margin-top: 1rem;">
+            <form method="POST" action="{{ url_for('update_profile') }}">
                 <div class="form-group">
                     <label for="occupation" class="form-label">Occupation</label>
                     <input type="text" id="occupation" name="occupation" class="form-control" 
@@ -46,10 +48,19 @@
                     <input type="number" id="age" name="age" class="form-control" 
                         value="{{ user.age if user.age else '' }}" required>
                 </div>
-                <button type="submit" class="btn btn-primary btn-sm">Save Profile</button>
+                <button type="submit" class="btn btn-primary">Save Profile</button>
             </form>
-            {% endif %}
-        <h2>Your Appointments</h2>
+        </div>
+        
+        <div class="header-with-actions">
+            <h2>Your Appointments</h2>
+            <div class="action-buttons">
+                <a href="{{ url_for('book_appointment') }}" class="btn btn-primary">
+                    <i class="fas fa-calendar-plus"></i> Book New Appointment
+                </a>
+            </div>
+        </div>
+        
         <p>
             Sort by:
             <a href="{{ url_for('patient_dashboard', sort_by='date', sort_order='asc') }}" class="{% if request.args.get('sort_by') == 'date' and request.args.get('sort_order') == 'asc' %}active{% endif %}">Date (Asc)</a>
@@ -57,6 +68,7 @@
             <a href="{{ url_for('patient_dashboard', sort_by='status', sort_order='asc') }}" class="{% if request.args.get('sort_by') == 'status' and request.args.get('sort_order') == 'asc' %}active{% endif %}">Status (Asc)</a>
             <a href="{{ url_for('patient_dashboard', sort_by='status', sort_order='desc') }}" class="{% if request.args.get('sort_by') == 'status' and request.args.get('sort_order') == 'desc' %}active{% endif %}">Status (Desc)</a>
         </p>
+        
         <table class="table table-striped table-hover">
             <thead>
                 <tr>
@@ -72,15 +84,15 @@
             <tbody>
                 {% for appt in appointments %}
                     <tr>
-                        <td>{{ appt[0] }}</td>
-                        <td>{{ appt[1] }}</td>
-                        <td>{{ appt[2] }}</td>
-                        <td>{{ appt[3] }}</td>
-                        <td>{{ appt[4] }}</td>
-                        <td>{{ appt[5] }}</td>
+                        <td>{{ appt.hospital }}</td>
+                        <td>{{ appt.department }}</td>
+                        <td>{{ appt.doctor }}</td>
+                        <td>{{ appt.date }}</td>
+                        <td>{{ appt.slot_time }}</td>
+                        <td>{{ appt.status }}</td>
                         <td>
-                            {% if appt[5] not in ['attended', 'closed'] %}
-                                <form action="{{ url_for('reschedule_patient', appt_id=appt[6]) }}" method="POST" style="display:inline;">
+                            {% if appt.status not in ['attended', 'closed'] %}
+                                <form action="{{ url_for('reschedule_patient', appt_id=appt.id) }}" method="POST" style="display:inline;">
                                     <input type="date" name="date" class="form-control d-inline-block" required>
                                     <input type="text" name="time" class="form-control d-inline-block" placeholder="e.g., 09:00 AM" required>
                                     <button type="submit" class="btn btn-sm btn-primary">Reschedule</button>
@@ -91,7 +103,6 @@
                 {% endfor %}
             </tbody>
         </table>
-        <a href="{{ url_for('book_appointment') }}" class="btn btn-primary btn-sm">Book New Appointment</a>
     </div>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>

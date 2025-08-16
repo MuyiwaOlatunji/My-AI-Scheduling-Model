@@ -1,233 +1,33 @@
 document.addEventListener('DOMContentLoaded', function () {
-    // Booking Form Functions
-    const hospitalSelect = document.getElementById('hospital');
-    const departmentSelect = document.getElementById('department');
-    const doctorSelect = document.getElementById('doctor');
-    const dateInput = document.getElementById('date');
-    const timeSelect = document.getElementById('time');
-    const slotAvailabilityDiv = document.getElementById('slotAvailability');
-    const submitBtn = document.getElementById('submitBtn');
-    const loadingSpinner = document.getElementById('loadingSpinner');
-    const toggleProfileBtn = document.getElementById('toggleProfileBtn');
-    const profileForm = document.getElementById('profileForm');
-
-    if (hospitalSelect) {
-        hospitalSelect.addEventListener('change', loadDepartments);
-        departmentSelect.disabled = true;
-        doctorSelect.disabled = true;
-        timeSelect.disabled = true;
-    }
-    if (departmentSelect) {
-        departmentSelect.addEventListener('change', loadDoctors);
-    }
-    if (doctorSelect && dateInput) {
-        doctorSelect.addEventListener('change', loadAvailableSlots);
-        dateInput.addEventListener('change', loadAvailableSlots);
-    }
-    if (timeSelect) {
-        timeSelect.addEventListener('change', checkSlotAvailability);
-    }
-    if (toggleProfileBtn && profileForm) {
-        toggleProfileBtn.addEventListener('click', function () {
-            profileForm.classList.toggle('show');
-            this.innerHTML = profileForm.classList.contains('show')
-                ? '<i class="fas fa-user-edit"></i> Hide Profile Update'
-                : '<i class="fas fa-user-edit"></i> Update Profile';
-        });
-    }
-
-    async function loadDepartments() {
-        const hospitalId = hospitalSelect.value;
-        resetDependentDropdowns();
-        if (!hospitalId) {
-            departmentSelect.disabled = true;
-            return;
-        }
-        departmentSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
-        try {
-            const response = await fetch(`/get_departments/${hospitalId}`);
-            if (!response.ok) throw new Error('Failed to fetch departments');
-            const data = await response.json();
-            departmentSelect.innerHTML = '<option value="" disabled selected>Select a department</option>';
-            data.forEach(dept => {
-                const option = new Option(dept.name, dept.id);
-                departmentSelect.appendChild(option);
-            });
-            departmentSelect.disabled = false;
-        } catch (error) {
-            departmentSelect.innerHTML = '<option value="" disabled selected>Error loading departments</option>';
-            departmentSelect.disabled = true;
-            console.error('Error loading departments:', error);
-        }
-    }
-
-    async function loadDoctors() {
-        const departmentId = departmentSelect.value;
-        doctorSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
-        doctorSelect.disabled = true;
-        if (!departmentId) return;
-        try {
-            const response = await fetch(`/get_doctors/${departmentId}`);
-            if (!response.ok) throw new Error('Failed to fetch doctors');
-            const data = await response.json();
-            doctorSelect.innerHTML = '<option value="" disabled selected>Select a doctor</option>';
-            data.forEach(doc => {
-                const option = new Option(doc.name, doc.id);
-                doctorSelect.appendChild(option);
-            });
-            doctorSelect.disabled = false;
-        } catch (error) {
-            doctorSelect.innerHTML = '<option value="" disabled selected>Error loading doctors</option>';
-            doctorSelect.disabled = true;
-            console.error('Error loading doctors:', error);
-        }
-    }
-
-    async function loadAvailableSlots() {
-        const doctorId = doctorSelect.value;
-        const date = dateInput.value;
-        if (!doctorId || !date) {
-            resetTimeSelect();
-            return;
-        }
-        timeSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
-        timeSelect.disabled = true;
-        slotAvailabilityDiv.textContent = '';
-        submitBtn.disabled = true;
-        loadingSpinner.style.display = 'block';
-        try {
-            const response = await fetch(`/get_available_slots?doctor_id=${doctorId}&date=${date}`);
-            if (!response.ok) throw new Error('Failed to fetch slots');
-            const data = await response.json();
-            loadingSpinner.style.display = 'none';
-            timeSelect.innerHTML = '<option value="" disabled selected>Select a time</option>';
-            if (data.error) {
-                slotAvailabilityDiv.textContent = data.error;
-                slotAvailabilityDiv.className = 'slot-unavailable';
-                timeSelect.innerHTML = '<option value="" disabled selected>No slots available</option>';
-            } else if (!data.length) {
-                slotAvailabilityDiv.textContent = 'No slots available';
-                slotAvailabilityDiv.className = 'slot-unavailable';
-                timeSelect.innerHTML = '<option value="" disabled selected>No slots available</option>';
-            } else {
-                data.forEach(slot => {
-                    const option = new Option(slot, slot);
-                    timeSelect.appendChild(option);
-                });
-                timeSelect.disabled = false;
-                slotAvailabilityDiv.textContent = 'Please select a time';
-                slotAvailabilityDiv.className = 'slot-available';
-                submitBtn.disabled = false;
-            }
-        } catch (error) {
-            loadingSpinner.style.display = 'none';
-            timeSelect.innerHTML = '<option value="" disabled selected>Error loading slots</option>';
-            slotAvailabilityDiv.textContent = 'Error loading slots';
-            slotAvailabilityDiv.className = 'slot-unavailable';
-            console.error('Error loading slots:', error);
-        }
-    }
-
-    async function checkSlotAvailability() {
-        const doctorId = doctorSelect.value;
-        const date = dateInput.value;
-        const time = timeSelect.value;
-        if (!doctorId || !date || !time) {
-            submitBtn.disabled = true;
-            return;
-        }
-        try {
-            const response = await fetch(`/check_slot?doctor_id=${doctorId}&date=${date}&time=${time}`);
-            if (!response.ok) throw new Error('Failed to check slot');
-            const data = await response.json();
-            slotAvailabilityDiv.textContent = data.available ? 'Slot available' : 'Slot unavailable';
-            slotAvailabilityDiv.className = data.available ? 'slot-available' : 'slot-unavailable';
-            submitBtn.disabled = !data.available;
-        } catch (error) {
-            slotAvailabilityDiv.textContent = 'Error checking slot';
-            slotAvailabilityDiv.className = 'slot-unavailable';
-            submitBtn.disabled = true;
-            console.error('Error checking slot:', error);
-        }
-    }
-
-    function resetDependentDropdowns() {
-        departmentSelect.innerHTML = '<option value="" disabled selected>Select a department</option>';
-        departmentSelect.disabled = true;
-        doctorSelect.innerHTML = '<option value="" disabled selected>Select a doctor</option>';
-        doctorSelect.disabled = true;
-        resetTimeSelect();
-    }
-
-    function resetTimeSelect() {
-        timeSelect.innerHTML = '<option value="" disabled selected>Select a date first</option>';
-        timeSelect.disabled = true;
-        slotAvailabilityDiv.textContent = '';
-        submitBtn.disabled = true;
-    }
-
-    // Hospital Registration Functions
-    window.addDepartment = function() {
-        const departmentsDiv = document.getElementById('departments');
-        const deptCount = parseInt(departmentsDiv.getAttribute('data-dept-count') || 0);
-        const newDeptIndex = deptCount;
-        departmentsDiv.setAttribute('data-dept-count', deptCount + 1);
-        const firstDept = departmentsDiv.querySelector('.department');
-        const newDept = firstDept.cloneNode(true);
-        newDept.setAttribute('data-dept-index', newDeptIndex);
-        newDept.setAttribute('data-doctor-count', 1);
-        newDept.querySelectorAll('input, select').forEach(input => {
-            input.name = input.name.replace(/\[\d+\]/, `[${newDeptIndex}]`);
-            input.value = '';
-        });
-        const doctorsDiv = newDept.querySelector('.doctors');
-        doctorsDiv.innerHTML = '';
-        addDoctor(newDeptIndex);
-        departmentsDiv.appendChild(newDept);
-    };
-
-    window.addDoctor = function(deptIndex) {
-        const deptDiv = document.querySelector(`.department[data-dept-index="${deptIndex}"]`);
-        const doctorCount = parseInt(deptDiv.getAttribute('data-doctor-count') || 0);
-        const newDoctorIndex = doctorCount;
-        deptDiv.setAttribute('data-doctor-count', doctorCount + 1);
-        const firstDoctor = document.querySelector('.department[data-dept-index="0"] .doctor');
-        const newDoctor = firstDoctor.cloneNode(true);
-        newDoctor.querySelectorAll('input, select').forEach(input => {
-            input.name = input.name.replace(/\[\d+\]\[\d+\]/, `[${deptIndex}][${newDoctorIndex}]`);
-            input.value = '';
-        });
-        deptDiv.querySelector('.doctors').appendChild(newDoctor);
-    };
-
     // Department and Doctor Management Functions
-    const addDepartmentBtn = document.getElementById('addDepartmentBtn');
-    const addDepartmentCard = document.getElementById('addDepartmentCard');
-    const addDepartmentForm = document.getElementById('addDepartmentForm');
-    const cancelDeptBtn = document.getElementById('cancelDeptBtn');
+    const showAddDepartmentBtn = document.getElementById('showAddDepartmentBtn');
+    const addDepartmentModal = document.getElementById('addDepartmentModal');
+    const closeDepartmentModal = document.getElementById('closeDepartmentModal');
+    const cancelAddDepartmentBtn = document.getElementById('cancelAddDepartmentBtn');
     const departmentSelectManage = document.getElementById('departmentSelect');
-    const doctorTable = document.getElementById('doctorTable');
-    const doctorList = document.getElementById('doctorList');
+    const doctorManagementSection = document.getElementById('doctorManagementSection');
+    const showAddDoctorBtn = document.getElementById('showAddDoctorBtn');
     const addDoctorCard = document.getElementById('addDoctorCard');
-    const addDoctorForm = document.getElementById('addDoctorForm');
-    const cancelDoctorBtn = document.getElementById('cancelDoctorBtn');
+    const cancelAddDoctorBtn = document.getElementById('cancelAddDoctorBtn');
+    const editDoctorModal = document.getElementById('editDoctorModal');
+    const closeEditDoctorModal = document.getElementById('closeEditDoctorModal');
+    const cancelEditDoctorBtn = document.getElementById('cancelEditDoctorBtn');
 
-    if (addDepartmentBtn && addDepartmentCard) {
-        addDepartmentBtn.addEventListener('click', function () {
-            addDepartmentCard.style.display = 'block';
+    if (showAddDepartmentBtn) {
+        showAddDepartmentBtn.addEventListener('click', function() {
+            addDepartmentModal.style.display = 'block';
         });
     }
 
-    if (cancelDeptBtn && addDepartmentCard) {
-        cancelDeptBtn.addEventListener('click', function () {
-            addDepartmentForm.reset();
-            addDepartmentCard.style.display = 'none';
+    if (closeDepartmentModal) {
+        closeDepartmentModal.addEventListener('click', function() {
+            addDepartmentModal.style.display = 'none';
         });
     }
 
-    if (addDepartmentForm) {
-        addDepartmentForm.addEventListener('submit', function (e) {
-            // Let the form submit to the server, which will handle the close via redirect
+    if (cancelAddDepartmentBtn) {
+        cancelAddDepartmentBtn.addEventListener('click', function() {
+            addDepartmentModal.style.display = 'none';
         });
     }
 
@@ -235,61 +35,78 @@ document.addEventListener('DOMContentLoaded', function () {
         departmentSelectManage.addEventListener('change', loadDoctorsForDepartment);
     }
 
-    async function loadDoctorsForDepartment() {
-        const deptId = departmentSelectManage.value;
-        if (!deptId) {
-            doctorTable.style.display = 'none';
-            return;
-        }
-        try {
-            const response = await fetch(`/get_doctors/${deptId}`);
-            if (!response.ok) throw new Error('Failed to fetch doctors');
-            const doctors = await response.json();
-            doctorList.innerHTML = '';
-            doctors.forEach(doc => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${doc.name}</td>
-                    <td>${doc.gender}</td>
-                    <td>${doc.schedule}</td>
-                    <td>
-                        <form method="POST" action="{{ url_for('manage_departments') }}" style="display:inline;">
-                            <input type="hidden" name="doctor_id" value="${doc.id}">
-                            <button type="submit" name="delete_doctor" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this doctor?')">Delete</button>
-                        </form>
-                    </td>
-                `;
-                doctorList.appendChild(row);
-            });
-            doctorTable.style.display = 'block';
-        } catch (error) {
-            console.error('Error loading doctors:', error);
-            doctorList.innerHTML = '<tr><td colspan="4">Error loading doctors</td></tr>';
-        }
-    }
-
-    if (addDoctorCard) {
-        departmentSelectManage.addEventListener('change', function () {
-            if (departmentSelectManage.value) {
-                addDoctorCard.style.display = 'block';
-                document.getElementById('addDoctorDeptId').value = departmentSelectManage.value;
-            } else {
-                addDoctorCard.style.display = 'none';
-            }
+    if (showAddDoctorBtn) {
+        showAddDoctorBtn.addEventListener('click', function() {
+            addDoctorCard.style.display = 'block';
         });
     }
 
-    if (cancelDoctorBtn && addDoctorCard) {
-        cancelDoctorBtn.addEventListener('click', function () {
-            addDoctorForm.reset();
+    if (cancelAddDoctorBtn) {
+        cancelAddDoctorBtn.addEventListener('click', function() {
             addDoctorCard.style.display = 'none';
         });
     }
 
-    if (addDoctorForm) {
-        addDoctorForm.addEventListener('submit', function (e) {
-            // Let the form submit to the server, which will handle the close via redirect
+    if (closeEditDoctorModal) {
+        closeEditDoctorModal.addEventListener('click', function() {
+            editDoctorModal.style.display = 'none';
         });
+    }
+
+    if (cancelEditDoctorBtn) {
+        cancelEditDoctorBtn.addEventListener('click', function() {
+            editDoctorModal.style.display = 'none';
+        });
+    }
+
+    function formatSchedule(schedule) {
+        if (!schedule) return 'Not set';
+        
+        try {
+            // Convert "mon-fri 9-17" to "Monday-Friday, 9:00 AM - 5:00 PM"
+            const parts = schedule.toLowerCase().split(' ');
+            if (parts.length !== 2) return schedule;
+            
+            const days = parts[0].split('-');
+            const times = parts[1].split('-');
+            
+            if (days.length !== 2 || times.length !== 2) return schedule;
+            
+            const dayMap = {
+                'mon': 'Monday',
+                'tue': 'Tuesday',
+                'wed': 'Wednesday',
+                'thu': 'Thursday',
+                'fri': 'Friday',
+                'sat': 'Saturday',
+                'sun': 'Sunday'
+            };
+            
+            const startDay = dayMap[days[0]] || days[0];
+            const endDay = dayMap[days[1]] || days[1];
+            
+            // Format times
+            const formatTime = (timeStr) => {
+                if (!timeStr) return '';
+                const timeMatch = timeStr.match(/^(\d{1,2})(?::(\d{2}))?$/);
+                if (!timeMatch) return timeStr;
+                
+                let hour = parseInt(timeMatch[1]);
+                const minute = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
+                const period = hour >= 12 ? 'PM' : 'AM';
+                hour = hour % 12 || 12;
+                
+                return `${hour}:${minute.toString().padStart(2, '0')} ${period}`;
+            };
+            
+            const startTime = formatTime(times[0]);
+            const endTime = formatTime(times[1]);
+            
+            return `${startDay}-${endDay}, ${startTime} - ${endTime}`;
+        } catch (e) {
+            console.error('Error formatting schedule:', e);
+            return schedule;
+        }
     }
 
     // Alert Fading
@@ -301,15 +118,165 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 5000);
     });
 
-    // Password Toggle
-    const togglePassword = document.querySelector('#togglePassword');
-    const password = document.querySelector('#password');
-    if (togglePassword && password) {
-        togglePassword.addEventListener('click', function () {
-            const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
-            password.setAttribute('type', type);
-            this.classList.toggle('fa-eye');
-            this.classList.toggle('fa-eye-slash');
-        });
+    // Close modals when clicking outside
+    window.onclick = function(event) {
+        if (event.target === addDepartmentModal) {
+            addDepartmentModal.style.display = 'none';
+        }
+        if (event.target === editDoctorModal) {
+            editDoctorModal.style.display = 'none';
+        }
     }
 });
+
+// Global functions
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type}`;
+    alertDiv.textContent = message;
+    document.body.insertBefore(alertDiv, document.body.firstChild);
+    
+    setTimeout(() => {
+        alertDiv.classList.add('fade');
+        setTimeout(() => alertDiv.remove(), 500);
+    }, 5000);
+}
+
+async function editDoctor(doctorId) {
+    try {
+        const response = await fetch(`/get_doctor_details/${doctorId}`);
+        if (!response.ok) throw new Error('Failed to fetch doctor details');
+        const doctor = await response.json();
+        
+        // Populate the edit form
+        document.getElementById('editDoctorId').value = doctor.id;
+        document.getElementById('editDoctorName').value = doctor.name;
+        document.getElementById('editDoctorGender').value = doctor.gender;
+        
+        // Parse schedule if available
+        if (doctor.schedule_parts) {
+            const parts = doctor.schedule_parts;
+            document.getElementById('editStartDay').value = parts.start_day;
+            document.getElementById('editEndDay').value = parts.end_day;
+            
+            // Set start time
+            const startTimeSelect = document.getElementById('editStartTime');
+            const startTimeOptions = Array.from(startTimeSelect.options);
+            const startTimeMatch = startTimeOptions.find(opt => 
+                opt.value.includes(parts.start_time.split(':')[0]));
+            if (startTimeMatch) startTimeMatch.selected = true;
+            
+            // Set end time
+            const endTimeSelect = document.getElementById('editEndTime');
+            const endTimeOptions = Array.from(endTimeSelect.options);
+            const endTimeMatch = endTimeOptions.find(opt => 
+                opt.value.includes(parts.end_time.split(':')[0]));
+            if (endTimeMatch) endTimeMatch.selected = true;
+        }
+        
+        // Show the modal
+        document.getElementById('editDoctorModal').style.display = 'block';
+    } catch (error) {
+        console.error('Error fetching doctor details:', error);
+        showAlert('Error loading doctor details', 'danger');
+    }
+}
+
+// Update saveDoctorChanges to handle notifications properly
+async function saveDoctorChanges() {
+    const form = document.getElementById('editDoctorForm');
+    const formData = new FormData(form);
+    
+    try {
+        const response = await fetch('/update_doctor', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.message || 'Failed to update doctor');
+        }
+        
+        if (result.success) {
+            // Only show one success notification
+            showAlert('Doctor updated successfully', 'success');
+            document.getElementById('editDoctorModal').style.display = 'none';
+            
+            // Reload the doctors list
+            const departmentSelect = document.getElementById('departmentSelect');
+            if (departmentSelect && departmentSelect.value) {
+                await loadDoctorsForDepartment();
+            }
+        } else {
+            throw new Error(result.message || 'Failed to update doctor');
+        }
+    } catch (error) {
+        console.error('Error updating doctor:', error);
+        // Only show one error notification
+        showAlert('Error updating doctor: ' + error.message, 'danger');
+    }
+}
+
+
+async function loadDoctorsForDepartment() {
+    const deptId = document.getElementById('departmentSelect').value;
+    const doctorManagementSection = document.getElementById('doctorManagementSection');
+    const addDoctorDeptId = document.getElementById('addDoctorDeptId');
+    
+    if (!deptId) {
+        doctorManagementSection.style.display = 'none';
+        return;
+    }
+    
+    addDoctorDeptId.value = deptId;
+    doctorManagementSection.style.display = 'block';
+    
+    try {
+        const response = await fetch(`/get_doctors/${deptId}`);
+        if (!response.ok) throw new Error('Failed to fetch doctors');
+        const doctors = await response.json();
+        const doctorList = document.getElementById('doctorList');
+        doctorList.innerHTML = '';
+        
+        if (doctors.length === 0) {
+            doctorList.innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center">No doctors found in this department</td>
+                </tr>
+            `;
+            return;
+        }
+        
+        doctors.forEach(doc => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${doc.name}</td>
+                <td>${doc.gender === 'M' ? 'Male' : 'Female'}</td>
+                <td>${formatSchedule(doc.schedule)}</td>
+                <td class="actions">
+                    <button class="btn btn-sm btn-warning" onclick="editDoctor(${doc.id})">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <form method="POST" action="/manage_departments" onsubmit="return confirm('Are you sure you want to delete this doctor?')">
+                        <input type="hidden" name="doctor_id" value="${doc.id}">
+                        <button type="submit" name="delete_doctor" class="btn btn-sm btn-danger">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </form>
+                </td>
+            `;
+            doctorList.appendChild(row);
+        });
+    } catch (error) {
+        console.error('Error loading doctors:', error);
+        const doctorList = document.getElementById('doctorList');
+        doctorList.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center error">Error loading doctors</td>
+            </tr>
+        `;
+        showAlert('Error loading doctors', 'danger');
+    }
+}
+

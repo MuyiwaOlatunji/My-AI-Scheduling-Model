@@ -25,27 +25,17 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        <h2>Manage Departments and Doctors</h2>
-        <div class="btn-container">
-            <a href="{{ url_for('manage_departments') }}" class="btn btn-primary">Manage Departments</a>
-            <button id="addDepartmentBtn" class="btn btn-primary">Add Department</button>
+        
+        <div class="header-with-actions">
+            <h2>Appointments</h2>
+            <div class="action-buttons">
+                <a href="{{ url_for('manage_departments') }}" class="btn btn-primary">Manage Departments</a>
+            </div>
         </div>
-        <div id="addDepartmentCard" class="form-container" style="display: none; margin-top: 1rem;">
-            <form id="addDepartmentForm" method="POST" action="{{ url_for('manage_departments') }}">
-                <h3>Add New Department</h3>
-                <div class="form-group">
-                    <label for="deptName" class="form-label">Department Name</label>
-                    <input type="text" id="deptName" name="name" class="form-control" required>
-                    <input type="hidden" name="add_department" value="1">
-                </div>
-                <button type="submit" class="btn btn-success">Save</button>
-                <button type="button" id="cancelDeptBtn" class="btn btn-danger">Cancel</button>
-            </form>
-        </div>
-        <h2>Appointments</h2>
+        
         <div class="search-container">
             <form method="GET">
-                <input type="text" name="search" value="{{ search_query }}" class="form-control" placeholder="Search...">
+                <input type="text" name="search" value="{{ search }}" class="form-control" placeholder="Search...">
                 <select name="search_type" class="form-select">
                     <option value="name" {% if search_type == 'name' %}selected{% endif %}>Patient Name</option>
                     <option value="email" {% if search_type == 'email' %}selected{% endif %}>Email</option>
@@ -55,6 +45,7 @@
                 <button type="submit" class="btn btn-primary">Search</button>
             </form>
         </div>
+        
         <table class="table table-striped table-hover">
             <thead>
                 <tr>
@@ -74,25 +65,20 @@
             <tbody>
                 {% for appt in appointments %}
                     <tr>
-                        <td>{{ appt[0] }}</td>
-                        <td>{{ appt[1] }}</td>
-                        <td>{{ appt[2] }}</td>
-                        <td>{{ appt[3] }}</td>
-                        <td>{{ appt[4] }}</td>
-                        <td>{{ appt[5] }}</td>
-                        <td>{{ appt[6] }}</td>
-                        <td class="{% if appt[7] > 0.5 %}high-risk{% else %}low-risk{% endif %}">{{ appt[7] | round(2) }}</td>
-                        <td class="{% if appt[8] > 0.5 %}high-risk{% else %}low-risk{% endif %}">{{ appt[8] | round(2) }}</td>
-                        <td>{{ appt[9] }}</td>
-                        <td class="btn-container">
-                            {% if appt[9] not in ['attended', 'closed'] %}
-                                <form action="{{ url_for('mark_attended', appt_id=appt[0]) }}" method="POST" style="display:inline;">
+                        <td>{{ appt.id }}</td>
+                        <td>{{ appt.patient_name }}</td>
+                        <td>{{ appt.email }}</td>
+                        <td>{{ appt.department_name }}</td>
+                        <td>{{ appt.doctor_name }}</td>
+                        <td>{{ appt.slot_time }}</td>
+                        <td>{{ appt.date }}</td>
+                        <td class="{% if appt.no_show_prob > 50 %}high-risk{% else %}low-risk{% endif %}">{{ appt.no_show_prob|round(2) }}%</td>
+                        <td class="{% if appt.reschedule_prob > 50 %}high-risk{% else %}low-risk{% endif %}">{{ appt.reschedule_prob|round(2) }}%</td>
+                        <td>{{ appt.status }}</td>
+                        <td class="actions">
+                            {% if appt.status not in ['attended', 'closed'] %}
+                                <form action="{{ url_for('mark_attended', appt_id=appt.id) }}" method="POST" style="display:inline;">
                                     <button type="submit" class="btn btn-sm btn-success">Mark Attended</button>
-                                </form>
-                                <form action="{{ url_for('reschedule', appt_id=appt[0]) }}" method="POST" style="display:inline;">
-                                    <input type="date" name="date" class="form-control d-inline-block" required>
-                                    <input type="text" name="time" class="form-control d-inline-block" placeholder="e.g., 09:00 AM" required>
-                                    <button type="submit" class="btn btn-sm btn-primary">Reschedule</button>
                                 </form>
                             {% endif %}
                         </td>

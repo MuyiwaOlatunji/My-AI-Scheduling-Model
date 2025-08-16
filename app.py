@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, make_response
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask_mail import Mail, Message
 import sqlite3
@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import os
 from dateutil.relativedelta import relativedelta
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, time
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import logging
@@ -20,8 +20,19 @@ load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "your_secure_secret_key_here")  # Ensure a secure key
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)  # Optional: set session lifetime
+app.secret_key = os.getenv("SECRET_KEY", "your_secure_secret_key_here")
+
+# Enhanced Session configuration
+app.config.update(
+    SESSION_COOKIE_NAME='flask_session',
+    PERMANENT_SESSION_LIFETIME=timedelta(minutes=30),
+    SESSION_COOKIE_SECURE=True,  # Requires HTTPS in production
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_REFRESH_EACH_REQUEST=True,
+    # Clear session when browser closes
+    SESSION_PERMANENT=False
+)
 
 # Flask-Mail configuration
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -41,14 +52,21 @@ def login_required(roles):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            print(f"login_required - Session: {session}, Path: {request.path}, Roles: {roles}")  # Debug
             if 'user_id' not in session:
                 flash("Please log in first.", "danger")
                 return redirect(url_for('hospital_admin_login' if 'hospital_admin' in roles else 'patient_login'))
-            user_role = query_db("SELECT role FROM users WHERE id = ?", (session['user_id'],), one=True)['role']
-            if user_role not in roles:
+            
+            # Verify user still exists in database
+            user = query_db("SELECT id, role FROM users WHERE id = ?", (session['user_id'],), one=True)
+            if not user:
+                session.clear()
+                flash("User account not found. Please log in again.", "danger")
+                return redirect(url_for('index'))
+            
+            if user['role'] not in roles:
                 flash("You do not have permission to access this page.", "danger")
                 return redirect(url_for('index'))
+            
             return f(*args, **kwargs)
         return decorated_function
     return decorator
@@ -93,7 +111,7 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS users 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL, 
                   password TEXT NOT NULL, role TEXT NOT NULL, age INTEGER, location TEXT, 
-                  gender TEXT, marriage_status TEXT, occupation TEXT, hospital_id INTEGER)''')
+                  gender TEXT, marriage_status TEXT, occupation TEXT, hospital_id INTEGER, phone TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS departments 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, hospital_id INTEGER, name TEXT,
                   FOREIGN KEY (hospital_id) REFERENCES hospitals(id))''')
@@ -148,22 +166,44 @@ def normalize_schedule_time(time_str):
 
 # Check doctor availability
 def is_doctor_available(doctor_id, date, time_slot):
-    doctor = query_db("SELECT schedule FROM doctors WHERE id = ?", (doctor_id,), one=True)
-    if not doctor:
-        return False
-    schedule = doctor['schedule'].lower()
     try:
+        doctor = query_db("SELECT schedule FROM doctors WHERE id = ?", (doctor_id,), one=True)
+        if not doctor or not doctor['schedule']:
+            return False
+            
+        schedule = doctor['schedule'].lower()
         match = re.match(r'^([a-z]{3})-([a-z]{3})\s+([\d:apm]+)-([\d:apm]+)$', schedule)
         if not match:
-            raise ValueError(f"Invalid schedule format: {schedule}")
+            app.logger.error(f"Invalid schedule format for doctor {doctor_id}: {schedule}")
+            return False
+            
         start_day, end_day, start_time_str, end_time_str = match.groups()
         
-        start_hour = int(normalize_schedule_time(start_time_str))
-        end_hour = int(normalize_schedule_time(end_time_str))
+        # Convert time to 24-hour format
+        def parse_time(time_str):
+            time_str = time_str.strip()
+            if ':' in time_str:
+                time_part, period = time_str[:-2], time_str[-2:]
+                hour, minute = map(int, time_part.split(':'))
+            else:
+                hour = int(time_str[:-2])
+                minute = 0
+                period = time_str[-2:]
+            
+            if period == 'pm' and hour != 12:
+                hour += 12
+            elif period == 'am' and hour == 12:
+                hour = 0
+            return hour, minute
         
+        start_hour, start_min = parse_time(start_time_str)
+        end_hour, end_min = parse_time(end_time_str)
+        
+        # Check day availability
         days_map = {'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6}
         start_day_idx = days_map.get(start_day)
         end_day_idx = days_map.get(end_day)
+        
         if start_day_idx is None or end_day_idx is None:
             app.logger.error(f"Invalid days in schedule: {start_day}-{end_day}")
             return False
@@ -173,21 +213,30 @@ def is_doctor_available(doctor_id, date, time_slot):
         if not (start_day_idx <= day_idx <= end_day_idx):
             return False
         
-        slot_time = datetime.strptime(time_slot, '%I:%M %p')
-        slot_hour = slot_time.hour
-        
-        if not (start_hour <= slot_hour < end_hour):
+        # Check time availability
+        try:
+            slot_time = datetime.strptime(time_slot, '%I:%M %p').time()
+            slot_dt = datetime.combine(date_obj, slot_time)
+            
+            start_dt = datetime.combine(date_obj, time(start_hour, start_min))
+            end_dt = datetime.combine(date_obj, time(end_hour, end_min))
+            
+            if not (start_dt <= slot_dt < end_dt):
+                return False
+        except ValueError as e:
+            app.logger.error(f"Error parsing time slot: {e}")
             return False
-    
-    except ValueError as e:
-        app.logger.error(f"Error parsing schedule for doctor_id {doctor_id}: {e}")
+        
+        # Check if slot is already booked
+        existing = query_db(
+            "SELECT id FROM appointments WHERE doctor_id = ? AND date = ? AND slot_time = ? AND status NOT IN ('cancelled', 'closed')",
+            (doctor_id, date, time_slot), one=True
+        )
+        return not bool(existing)
+        
+    except Exception as e:
+        app.logger.error(f"Error in is_doctor_available: {e}")
         return False
-    
-    existing = query_db(
-        "SELECT id FROM appointments WHERE doctor_id = ? AND date = ? AND slot_time = ? AND status NOT IN ('cancelled', 'closed')",
-        (doctor_id, date, time_slot), one=True
-    )
-    return not bool(existing)
 
 # Prediction functions using trained models
 def predict_no_show(features):
@@ -303,17 +352,38 @@ def check_no_shows_and_reschedule():
                         break
 
 # Routes
+@app.before_request
+def check_session():
+    # Skip session check for these endpoints
+    if request.endpoint in ['patient_login', 'hospital_admin_login', 'super_admin_login', 'logout', 'static', 'index']:
+        return
+    
+    # Check if user is logged in
+    if 'user_id' not in session:
+        flash("Please log in to access this page.", "danger")
+        return redirect(url_for('index'))
+    
+    # Verify user still exists
+    user = query_db("SELECT id FROM users WHERE id = ?", (session['user_id'],), one=True)
+    if not user:
+        session.clear()
+        flash("Session expired. Please log in again.", "warning")
+        return redirect(url_for('index'))
+        
 @app.route('/')
 def index():
-    print(f"Index - Session: {session}")  # Debug
     if 'user_id' in session:
-        user_role = query_db("SELECT role FROM users WHERE id = ?", (session['user_id'],), one=True)['role']
-        if user_role == 'hospital_admin':
-            return redirect(url_for('hospital_admin_dashboard'))
-        elif user_role == 'patient':
-            return redirect(url_for('patient_dashboard'))
-        elif user_role == 'super_admin':
-            return redirect(url_for('super_admin'))
+        user = query_db("SELECT role FROM users WHERE id = ?", (session['user_id'],), one=True)
+        if user:
+            if user['role'] == 'hospital_admin':
+                return redirect(url_for('hospital_admin_dashboard'))
+            elif user['role'] == 'patient':
+                return redirect(url_for('patient_dashboard'))
+            elif user['role'] == 'super_admin':
+                return redirect(url_for('super_admin'))
+    
+    # Clear any invalid session
+    session.clear()
     return render_template('index.html')
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -323,7 +393,7 @@ def register():
             user_data = {
                 'name': request.form['name'],
                 'email': request.form['email'],
-                'phone': request.form['phone'],
+                'phone': request.form.get('phone', ''),  # Use get with default empty string
                 'password': generate_password_hash(request.form['password']),
                 'role': 'patient',
                 'age': int(request.form.get('age', 30)),
@@ -348,6 +418,7 @@ def patient_login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
+        
         if not email or not password:
             flash('Please provide both email and password', 'danger')
             return redirect(url_for('patient_login'))
@@ -355,30 +426,47 @@ def patient_login():
         user = query_db("SELECT * FROM users WHERE email = ? AND role = 'patient'", (email,), one=True)
         
         if user and check_password_hash(user['password'], password):
+            # Clear previous session
+            session.clear()
+            
+            # Set new session with strict security
             session['user_id'] = user['id']
             session['role'] = user['role']
+            session['_fresh'] = True  # Marks the session as fresh
+            
+            # Create response with security headers
+            response = make_response(redirect(url_for('patient_dashboard')))
+            response.headers['Cache-Control'] = 'no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            
             flash('Logged in successfully', 'success')
-            return redirect(url_for('patient_dashboard'))
+            return response
         
         flash('Invalid credentials', 'danger')
     return render_template('patient_login.html')
 
 @app.route('/hospital_admin_login', methods=['GET', 'POST'])
 def hospital_admin_login():
-    print(f"hospital_admin_login - Session: {session}")  # Debug
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
         user = query_db("SELECT * FROM users WHERE email = ? AND role = 'hospital_admin'", (email,), one=True)
         
         if user and check_password_hash(user['password'], password):
+            session.clear()
             session['user_id'] = user['id']
             session['role'] = user['role']
+            session['_fresh'] = True
+            
+            response = make_response(redirect(url_for('hospital_admin_dashboard')))
+            response.headers['Cache-Control'] = 'no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            
             flash("Logged in successfully.", "success")
-            return redirect(url_for('hospital_admin_dashboard'))
+            return response
         
         flash("Invalid credentials or not a hospital admin.", "danger")
-    return render_template('hospital_admin_login.html')  # Changed to correct template
+    return render_template('hospital_admin_login.html')
 
 @app.route('/super_admin_login', methods=['GET', 'POST'])
 def super_admin_login():
@@ -394,8 +482,14 @@ def super_admin_login():
         if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
             session['role'] = user['role']
+            session['_fresh'] = True
+            
+            response = make_response(redirect(url_for('super_admin')))
+            response.headers['Cache-Control'] = 'no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            
             flash("Logged in successfully.", "success")
-            return redirect(url_for('super_admin'))
+            return response
         
         flash("Invalid credentials or not a super admin.", "danger")
         return redirect(url_for('super_admin_login'))
@@ -609,16 +703,132 @@ def hospital_register():
 @login_required(['hospital_admin'])
 def manage_departments():
     hospital_id = query_db("SELECT hospital_id FROM users WHERE id = ?", (session['user_id'],), one=True)['hospital_id']
+    
     if request.method == 'POST':
         if 'add_department' in request.form:
             query_db("INSERT INTO departments (hospital_id, name) VALUES (?, ?)", 
                      (hospital_id, request.form['name']), commit=True)
             flash("Department added successfully", "success")
             return redirect(url_for('manage_departments'))
-        # Other POST logic (delete_department, add_doctor, delete_doctor)
-    departments = query_db("SELECT id, name FROM departments WHERE hospital_id = ?", (hospital_id,))
-    dept_doctors = {dept['id']: query_db("SELECT id, name, gender, schedule FROM doctors WHERE department_id = ?", (dept['id'],)) for dept in departments}
-    return render_template('manage_departments.html', departments=departments, dept_doctors=dept_doctors)
+        
+        if 'add_doctor' in request.form:
+            # Format the schedule string properly
+            start_day = request.form['start_day'].lower()
+            end_day = request.form['end_day'].lower()
+            start_time = request.form['start_time'].replace(' ', '').lower()
+            end_time = request.form['end_time'].replace(' ', '').lower()
+            
+            schedule = f"{start_day}-{end_day} {start_time}-{end_time}"
+            
+            query_db(
+                "INSERT INTO doctors (hospital_id, department_id, name, gender, schedule) VALUES (?, ?, ?, ?, ?)",
+                (hospital_id, request.form['dept_id'], request.form['doctor_name'], 
+                 request.form['doctor_gender'], schedule),
+                commit=True
+            )
+            flash("Doctor added successfully", "success")
+            return redirect(url_for('manage_departments'))
+        
+        if 'delete_doctor' in request.form:
+            query_db("DELETE FROM doctors WHERE id = ?", (request.form['doctor_id'],), commit=True)
+            flash("Doctor deleted successfully", "success")
+            return redirect(url_for('manage_departments'))
+    
+    # Get all departments with their doctors
+    departments = query_db("""
+        SELECT d.id, d.name, 
+               (SELECT COUNT(*) FROM doctors WHERE department_id = d.id) AS doctor_count
+        FROM departments d 
+        WHERE d.hospital_id = ?
+        ORDER BY d.name
+    """, (hospital_id,))
+    
+    # Get all doctors for each department
+    for dept in departments:
+        dept['doctors'] = query_db("""
+            SELECT id, name, gender, schedule 
+            FROM doctors 
+            WHERE department_id = ?
+            ORDER BY name
+        """, (dept['id'],))
+    
+    return render_template('manage_departments.html', departments=departments)
+
+@app.route('/get_doctor_details/<int:doctor_id>')
+@login_required(['hospital_admin'])
+def get_doctor_details(doctor_id):
+    doctor = query_db("SELECT * FROM doctors WHERE id = ?", (doctor_id,), one=True)
+    if not doctor:
+        return jsonify({'error': 'Doctor not found'}), 404
+    
+    # Parse the schedule if it exists
+    schedule_parts = {}
+    if doctor['schedule']:
+        try:
+            parts = doctor['schedule'].lower().split(' ')
+            if len(parts) == 2:
+                days_part, times_part = parts
+                start_day, end_day = days_part.split('-')
+                start_time, end_time = times_part.split('-')
+                
+                # Convert times to 12-hour format for display
+                def format_time_for_display(time_str):
+                    try:
+                        if ':' in time_str:
+                            hour, minute = map(int, time_str.split(':'))
+                        else:
+                            hour = int(time_str)
+                            minute = 0
+                        
+                        period = 'AM' if hour < 12 else 'PM'
+                        display_hour = hour % 12 or 12
+                        return f"{display_hour}:{minute:02d} {period}"
+                    except:
+                        return time_str
+                
+                schedule_parts = {
+                    'start_day': start_day,
+                    'end_day': end_day,
+                    'start_time': format_time_for_display(start_time),
+                    'end_time': format_time_for_display(end_time)
+                }
+        except Exception as e:
+            app.logger.error(f"Error parsing schedule: {e}")
+    
+    return jsonify({
+        'id': doctor['id'],
+        'name': doctor['name'],
+        'gender': doctor['gender'],
+        'schedule': doctor['schedule'],
+        'schedule_parts': schedule_parts
+    })
+
+@app.route('/update_doctor', methods=['POST'])
+@login_required(['hospital_admin'])
+def update_doctor():
+    try:
+        doctor_id = request.form['doctor_id']
+        name = request.form['name']
+        gender = request.form['gender']
+        start_day = request.form['start_day']
+        end_day = request.form['end_day']
+        start_time = request.form['start_time']
+        end_time = request.form['end_time']
+        
+        # Format the schedule string
+        schedule = f"{start_day}-{end_day} {start_time}-{end_time}"
+        
+        query_db(
+            "UPDATE doctors SET name = ?, gender = ?, schedule = ? WHERE id = ?",
+            (name, gender, schedule, doctor_id),
+            commit=True
+        )
+        
+        # Return success without message (let frontend handle the message)
+        return jsonify({'success': True})
+    except Exception as e:
+        # Return error without message (let frontend handle the message)
+        return jsonify({'success': False}), 400
 
 @app.route('/suspend_hospital/<int:hospital_id>', methods=['POST'])
 @login_required(['super_admin'])
@@ -681,13 +891,28 @@ def mark_attended(appt_id):
 
 @app.route('/logout')
 def logout():
+    # Clear server-side session data
     session.clear()
+    
+    # Create response that clears client-side cookies and prevents caching
+    response = make_response(redirect(url_for('index')))
+    response.delete_cookie('session')
+    response.delete_cookie(app.config['SESSION_COOKIE_NAME'])
+    response.headers['Cache-Control'] = 'no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    
     flash("Logged out successfully", "success")
-    return redirect(url_for('index'))
+    return response
 
 if __name__ == '__main__':
     init_db()
     scheduler = BackgroundScheduler()
     scheduler.add_job(check_no_shows_and_reschedule, 'cron', hour=8)
     scheduler.start()
-    app.run(debug=True, use_reloader=False)
+    
+    # Run with extra security headers
+    app.run(
+        debug=True,
+        use_reloader=False,
+        ssl_context='adhoc' if os.getenv('FLASK_ENV') == 'production' else None
+    )
