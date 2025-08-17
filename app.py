@@ -171,36 +171,66 @@ def is_doctor_available(doctor_id, date, time_slot):
         if not doctor or not doctor['schedule']:
             return False
             
-        schedule = doctor['schedule'].lower()
-        match = re.match(r'^([a-z]{3})-([a-z]{3})\s+([\d:apm]+)-([\d:apm]+)$', schedule)
-        if not match:
+        schedule = doctor['schedule'].lower().strip()
+        
+        # Split into days and times parts
+        parts = schedule.split(' ')
+        if len(parts) != 2:
             app.logger.error(f"Invalid schedule format for doctor {doctor_id}: {schedule}")
             return False
             
-        start_day, end_day, start_time_str, end_time_str = match.groups()
+        days_part, times_part = parts
+        
+        # Split days
+        days = days_part.split('-')
+        if len(days) != 2:
+            app.logger.error(f"Invalid days format in schedule: {schedule}")
+            return False
+            
+        # Split times
+        times = times_part.split('-')
+        if len(times) != 2:
+            app.logger.error(f"Invalid times format in schedule: {schedule}")
+            return False
+            
+        start_day, end_day = days
+        start_time_str, end_time_str = times
         
         # Convert time to 24-hour format
         def parse_time(time_str):
-            time_str = time_str.strip()
-            if ':' in time_str:
-                time_part, period = time_str[:-2], time_str[-2:]
-                hour, minute = map(int, time_part.split(':'))
-            else:
-                hour = int(time_str[:-2])
-                minute = 0
-                period = time_str[-2:]
+            time_str = time_str.strip().lower()
+            period = None
             
+            # Handle AM/PM
+            if 'am' in time_str or 'pm' in time_str:
+                period = 'am' if 'am' in time_str else 'pm'
+                time_str = time_str.replace('am', '').replace('pm', '').strip()
+            
+            if ':' in time_str:
+                hour, minute = map(int, time_str.split(':'))
+            else:
+                hour = int(time_str)
+                minute = 0
+                
+            # Adjust for period
             if period == 'pm' and hour != 12:
                 hour += 12
             elif period == 'am' and hour == 12:
                 hour = 0
+                
             return hour, minute
         
-        start_hour, start_min = parse_time(start_time_str)
-        end_hour, end_min = parse_time(end_time_str)
+        try:
+            start_hour, start_min = parse_time(start_time_str)
+            end_hour, end_min = parse_time(end_time_str)
+        except ValueError as e:
+            app.logger.error(f"Error parsing time in schedule: {e}")
+            return False
         
         # Check day availability
-        days_map = {'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6}
+        days_map = {'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 
+                   'fri': 4, 'sat': 5, 'sun': 6}
+        
         start_day_idx = days_map.get(start_day)
         end_day_idx = days_map.get(end_day)
         
@@ -210,8 +240,14 @@ def is_doctor_available(doctor_id, date, time_slot):
         
         date_obj = datetime.strptime(date, '%Y-%m-%d')
         day_idx = date_obj.weekday()
-        if not (start_day_idx <= day_idx <= end_day_idx):
-            return False
+        
+        # Handle wrap-around (e.g., fri-mon)
+        if start_day_idx <= end_day_idx:
+            if not (start_day_idx <= day_idx <= end_day_idx):
+                return False
+        else:
+            if not (day_idx >= start_day_idx or day_idx <= end_day_idx):
+                return False
         
         # Check time availability
         try:
@@ -539,70 +575,100 @@ def update_profile():
 @app.route('/book', methods=['GET', 'POST'])
 @login_required(['patient'])
 def book_appointment():
-    if request.method == 'POST':
-        try:
-            hospital_id = request.form['hospital']
-            department_id = request.form['department']
-            doctor_id = request.form['doctor']
-            date_str = request.form['date']
-            slot_time = request.form['time']
-            health_challenge = request.form['health_challenge']
-            
-            if not is_doctor_available(doctor_id, date_str, slot_time):
-                flash("Selected slot is not available", "danger")
-                return redirect(url_for('book_appointment'))
-            
-            patient = query_db("SELECT * FROM users WHERE id = ?", (session['user_id'],), one=True)
-            hospital = query_db("SELECT location FROM hospitals WHERE id = ?", (hospital_id,), one=True)
-            
-            appointment_date = datetime.strptime(date_str, '%Y-%m-%d')
-            booking_date = datetime.now()
-            lead_time = (appointment_date - booking_date).days
-            
-            features = [
-                query_db("SELECT COUNT(*) FROM appointments WHERE patient_id = ? AND status = 'no-show'", 
-                        (session['user_id'],), one=True)['COUNT(*)'],
-                lead_time,
-                0 if patient['location'] == hospital['location'] else 1,
-                1 if 'AM' in slot_time.upper() else 0,
-                0 if appointment_date.weekday() < 5 else 1,
-                patient['age'],
-                0 if query_db("SELECT gender FROM doctors WHERE id = ?", (doctor_id,), one=True)['gender'] == 'M' else 1,
-                {'M': 0, 'F': 1, 'Other': 2}[patient['gender']],
-                {'Single': 0, 'Married': 1, 'Divorced': 2, 'Widowed': 3}[patient['marriage_status']],
-                1 if patient['occupation'].strip() else 0,
-                len(health_challenge)
-            ]
-            
-            no_show_prob = predict_no_show(features)
-            reschedule_prob = predict_reschedule(features)
-            
-            query_db("""
-                INSERT INTO appointments (patient_id, hospital_id, department_id, doctor_id, slot_time, date, 
-                booking_date, no_show_prob, reschedule_prob, status, health_challenge)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (session['user_id'], hospital_id, department_id, doctor_id, slot_time, date_str,
-                  booking_date.strftime('%Y-%m-%d'), no_show_prob, reschedule_prob, 'scheduled', health_challenge),
-                commit=True)
-            
-            flash("Appointment booked successfully!", "success")
-            return redirect(url_for('patient_dashboard'))
-        except Exception as e:
-            app.logger.error(f"Error booking appointment: {e}")
-            flash("Error booking appointment", "danger")
+    if request.method == 'GET':
+        hospitals = query_db("SELECT * FROM hospitals WHERE subscription_status = 'active'")
+        return render_template('booking.html', hospitals=hospitals)
     
-    hospitals = query_db("SELECT * FROM hospitals WHERE subscription_status = 'active'")
-    return render_template('booking.html', hospitals=hospitals)
+    # POST request handling
+    try:
+        # Get JSON data from request
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+
+        # Extract form data
+        hospital_id = data.get('hospital')
+        department_id = data.get('department')
+        doctor_id = data.get('doctor')
+        date_str = data.get('date')
+        slot_time = data.get('time')
+        health_challenge = data.get('health_challenge')
+
+        # Validate required fields
+        if not all([hospital_id, department_id, doctor_id, date_str, slot_time, health_challenge]):
+            return jsonify({'success': False, 'message': 'All fields are required'}), 400
+
+        # Convert string IDs to integers
+        try:
+            hospital_id = int(hospital_id)
+            department_id = int(department_id)
+            doctor_id = int(doctor_id)
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Invalid ID format'}), 400
+
+        # Check doctor availability
+        if not is_doctor_available(doctor_id, date_str, slot_time):
+            return jsonify({'success': False, 'message': 'Selected slot is not available'}), 400
+
+        # Get patient and hospital info
+        patient = query_db("SELECT * FROM users WHERE id = ?", (session['user_id'],), one=True)
+        hospital = query_db("SELECT location FROM hospitals WHERE id = ?", (hospital_id,), one=True)
+
+        # Calculate appointment details
+        appointment_date = datetime.strptime(date_str, '%Y-%m-%d')
+        booking_date = datetime.now()
+        lead_time = (appointment_date - booking_date).days
+
+        # Prepare features for prediction
+        features = [
+            query_db("SELECT COUNT(*) FROM appointments WHERE patient_id = ? AND status = 'no-show'", 
+                    (session['user_id'],), one=True)['COUNT(*)'],
+            lead_time,
+            0 if patient['location'] == hospital['location'] else 1,
+            1 if 'AM' in slot_time.upper() else 0,
+            0 if appointment_date.weekday() < 5 else 1,
+            patient['age'],
+            0 if query_db("SELECT gender FROM doctors WHERE id = ?", (doctor_id,), one=True)['gender'] == 'M' else 1,
+            {'M': 0, 'F': 1, 'Other': 2}[patient['gender']],
+            {'Single': 0, 'Married': 1, 'Divorced': 2, 'Widowed': 3}[patient['marriage_status']],
+            1 if patient['occupation'].strip() else 0,
+            len(health_challenge)
+        ]
+        
+        # Make predictions
+        no_show_prob = predict_no_show(features)
+        reschedule_prob = predict_reschedule(features)
+
+        # Create appointment
+        appointment_id = query_db("""
+            INSERT INTO appointments (patient_id, hospital_id, department_id, doctor_id, 
+            slot_time, date, booking_date, no_show_prob, reschedule_prob, 
+            status, health_challenge)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (session['user_id'], hospital_id, department_id, doctor_id, 
+             slot_time, date_str, booking_date.strftime('%Y-%m-%d'), 
+             no_show_prob, reschedule_prob, 'scheduled', health_challenge),
+            commit=True, return_id=True
+        )
+
+        return jsonify({
+            'success': True,
+            'message': 'Appointment booked successfully',
+            'redirect': url_for('patient_dashboard')
+        })
+
+    except Exception as e:
+        app.logger.error(f"Error booking appointment: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
 
 @app.route('/get_departments/<int:hospital_id>')
 def get_departments(hospital_id):
     departments = query_db("SELECT id, name FROM departments WHERE hospital_id = ?", (hospital_id,))
     return jsonify([{'id': dept['id'], 'name': dept['name']} for dept in departments])
-
-@app.route('/get_doctors/<int:department_id>')
-def get_doctors(department_id):
-    doctors = query_db("SELECT id, name FROM doctors WHERE department_id = ?", (department_id,))
-    return jsonify([{'id': doc['id'], 'name': doc['name']} for doc in doctors])
 
 @app.route('/get_available_slots')
 @login_required(['patient'])
@@ -624,6 +690,64 @@ def get_available_slots():
     
     return jsonify(available_slots)
 
+@app.route('/api/doctors/<int:doctor_id>/details')
+@login_required(['hospital_admin'])
+def get_doctor_details(doctor_id):
+    try:
+        doctor = query_db("""
+            SELECT id, name, gender, schedule 
+            FROM doctors 
+            WHERE id = ?
+        """, (doctor_id,), one=True)
+        
+        if not doctor:
+            return jsonify({'error': 'Doctor not found'}), 404
+            
+        # Parse schedule into parts for the edit form
+        schedule_parts = {}
+        if doctor['schedule']:
+            parts = doctor['schedule'].lower().split(' ')
+            if len(parts) == 2:
+                days = parts[0].split('-')
+                times = parts[1].split('-')
+                
+                if len(days) == 2:
+                    schedule_parts['start_day'] = days[0]
+                    schedule_parts['end_day'] = days[1]
+                
+                if len(times) == 2:
+                    schedule_parts['start_time'] = times[0]
+                    schedule_parts['end_time'] = times[1]
+        
+        return jsonify({
+            'id': doctor['id'],
+            'name': doctor['name'],
+            'gender': doctor['gender'],
+            'schedule': doctor['schedule'],
+            'schedule_parts': schedule_parts
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error getting doctor details: {str(e)}")
+        return jsonify({'error': 'Server error getting doctor details'}), 500
+
+@app.route('/api/departments/<int:department_id>/doctors')
+@login_required(['hospital_admin'])
+def get_department_doctors(department_id):
+    try:
+        doctors = query_db("""
+            SELECT id, name, gender, schedule 
+            FROM doctors 
+            WHERE department_id = ?
+            ORDER BY name
+        """, (department_id,))
+        
+        return jsonify([dict(doctor) for doctor in doctors])
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching department doctors: {str(e)}")
+        return jsonify({'error': 'Server error fetching doctors'}), 500
+    
 @app.route('/super_admin')
 @login_required(['super_admin'])
 def super_admin():
@@ -653,8 +777,10 @@ def hospital_admin_dashboard():
     search_type = request.args.get('search_type', 'name')
     
     query = """
-    SELECT a.id, u.name AS patient_name, u.email, d.name AS department, doc.name AS doctor, 
-           a.slot_time, a.date, a.no_show_prob, a.reschedule_prob, a.status
+    SELECT a.id, u.name AS patient_name, u.email, 
+           d.name AS department_name, doc.name AS doctor_name,
+           a.slot_time, a.date, a.no_show_prob, a.reschedule_prob, 
+           a.status, a.doctor_id, doc.schedule AS doctor_schedule
     FROM appointments a
     JOIN users u ON a.patient_id = u.id
     JOIN departments d ON a.department_id = d.id
@@ -672,10 +798,15 @@ def hospital_admin_dashboard():
             query += " AND d.name LIKE ?"
         elif search_type == 'doctor':
             query += " AND doc.name LIKE ?"
+        elif search_type == 'status':
+            query += " AND a.status LIKE ?"
         args.append(f"%{search}%")
     
     appointments = query_db(query, args)
-    return render_template('hospital_admin.html', appointments=appointments, search=search, search_type=search_type)
+    return render_template('hospital_admin.html', 
+                         appointments=appointments, 
+                         search=search, 
+                         search_type=search_type)
 
 @app.route('/hospital_register', methods=['GET', 'POST'])
 @login_required(['super_admin'])
@@ -754,81 +885,115 @@ def manage_departments():
     
     return render_template('manage_departments.html', departments=departments)
 
-@app.route('/get_doctor_details/<int:doctor_id>')
+@app.route('/add_doctor', methods=['POST'])
 @login_required(['hospital_admin'])
-def get_doctor_details(doctor_id):
-    doctor = query_db("SELECT * FROM doctors WHERE id = ?", (doctor_id,), one=True)
-    if not doctor:
-        return jsonify({'error': 'Doctor not found'}), 404
-    
-    # Parse the schedule if it exists
-    schedule_parts = {}
-    if doctor['schedule']:
-        try:
-            parts = doctor['schedule'].lower().split(' ')
-            if len(parts) == 2:
-                days_part, times_part = parts
-                start_day, end_day = days_part.split('-')
-                start_time, end_time = times_part.split('-')
-                
-                # Convert times to 12-hour format for display
-                def format_time_for_display(time_str):
-                    try:
-                        if ':' in time_str:
-                            hour, minute = map(int, time_str.split(':'))
-                        else:
-                            hour = int(time_str)
-                            minute = 0
-                        
-                        period = 'AM' if hour < 12 else 'PM'
-                        display_hour = hour % 12 or 12
-                        return f"{display_hour}:{minute:02d} {period}"
-                    except:
-                        return time_str
-                
-                schedule_parts = {
-                    'start_day': start_day,
-                    'end_day': end_day,
-                    'start_time': format_time_for_display(start_time),
-                    'end_time': format_time_for_display(end_time)
-                }
-        except Exception as e:
-            app.logger.error(f"Error parsing schedule: {e}")
-    
-    return jsonify({
-        'id': doctor['id'],
-        'name': doctor['name'],
-        'gender': doctor['gender'],
-        'schedule': doctor['schedule'],
-        'schedule_parts': schedule_parts
-    })
+def add_doctor():
+    try:
+        # Get hospital_id from the logged-in admin
+        hospital_id = query_db("SELECT hospital_id FROM users WHERE id = ?", 
+                             (session['user_id'],), one=True)['hospital_id']
+        
+        # Get form data
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+            
+        department_id = data.get('department_id')
+        name = data.get('name')
+        gender = data.get('gender')
+        start_day = data.get('start_day')
+        end_day = data.get('end_day')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        
+        # Validate required fields
+        if not all([department_id, name, gender, start_day, end_day, start_time, end_time]):
+            return jsonify({'success': False, 'message': 'All fields are required'}), 400
+            
+        # Format the schedule string
+        schedule = f"{start_day.lower()}-{end_day.lower()} {start_time.lower()}-{end_time.lower()}"
+        
+        # Insert the new doctor
+        doctor_id = query_db(
+            "INSERT INTO doctors (hospital_id, department_id, name, gender, schedule) VALUES (?, ?, ?, ?, ?)",
+            (hospital_id, department_id, name, gender, schedule),
+            commit=True, return_id=True
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Doctor added successfully',
+            'doctor_id': doctor_id
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error adding doctor: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/get_doctors/<int:department_id>')
+def get_doctors(department_id):
+    try:
+        doctors = query_db("""
+            SELECT id, name, gender, schedule 
+            FROM doctors 
+            WHERE department_id = ?
+            ORDER BY name
+        """, (department_id,))
+        
+        if not doctors:
+            return jsonify([])
+            
+        return jsonify([dict(doctor) for doctor in doctors])
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching doctors: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/update_doctor', methods=['POST'])
 @login_required(['hospital_admin'])
 def update_doctor():
     try:
-        doctor_id = request.form['doctor_id']
-        name = request.form['name']
-        gender = request.form['gender']
-        start_day = request.form['start_day']
-        end_day = request.form['end_day']
-        start_time = request.form['start_time']
-        end_time = request.form['end_time']
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+
+        doctor_id = data.get('doctor_id')
+        name = data.get('name')
+        gender = data.get('gender')
+        start_day = data.get('start_day')
+        end_day = data.get('end_day')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+
+        # Validate required fields
+        if not all([doctor_id, name, gender, start_day, end_day, start_time, end_time]):
+            return jsonify({'success': False, 'message': 'All fields are required'}), 400
+
+        # Verify the doctor belongs to the admin's hospital
+        hospital_id = query_db("SELECT hospital_id FROM users WHERE id = ?", (session['user_id'],), one=True)['hospital_id']
+        doctor = query_db("SELECT id FROM doctors WHERE id = ? AND hospital_id = ?", (doctor_id, hospital_id), one=True)
         
+        if not doctor:
+            return jsonify({'success': False, 'message': 'Doctor not found or not authorized'}), 404
+
         # Format the schedule string
-        schedule = f"{start_day}-{end_day} {start_time}-{end_time}"
-        
+        schedule = f"{start_day.lower()}-{end_day.lower()} {start_time}-{end_time}"
+
+        # Update the doctor
         query_db(
             "UPDATE doctors SET name = ?, gender = ?, schedule = ? WHERE id = ?",
             (name, gender, schedule, doctor_id),
             commit=True
         )
-        
-        # Return success without message (let frontend handle the message)
-        return jsonify({'success': True})
+
+        return jsonify({'success': True, 'message': 'Doctor updated successfully'})
+
     except Exception as e:
-        # Return error without message (let frontend handle the message)
-        return jsonify({'success': False}), 400
+        app.logger.error(f"Error updating doctor: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/suspend_hospital/<int:hospital_id>', methods=['POST'])
 @login_required(['super_admin'])
@@ -846,20 +1011,98 @@ def activate_hospital(hospital_id):
     flash("Hospital activated", "success")
     return redirect(url_for('super_admin'))
 
-@app.route('/delete_hospital/<int:hospital_id>', methods=['POST'])
-@login_required(['super_admin'])
-def delete_hospital(hospital_id):
-    has_users = query_db("SELECT COUNT(*) as count FROM users WHERE hospital_id = ?", (hospital_id,), one=True)['count'] > 0
-    has_departments = query_db("SELECT COUNT(*) as count FROM departments WHERE hospital_id = ?", (hospital_id,), one=True)['count'] > 0
-    has_doctors = query_db("SELECT COUNT(*) as count FROM doctors WHERE hospital_id = ?", (hospital_id,), one=True)['count'] > 0
-    has_appointments = query_db("SELECT COUNT(*) as count FROM appointments WHERE hospital_id = ?", (hospital_id,), one=True)['count'] > 0
+@app.route('/delete_doctor/<int:doctor_id>', methods=['POST'])
+@login_required(['hospital_admin'])
+def delete_doctor(doctor_id):
+    try:
+        # Verify the doctor belongs to the admin's hospital
+        hospital_id = query_db("SELECT hospital_id FROM users WHERE id = ?", (session['user_id'],), one=True)['hospital_id']
+        doctor = query_db("SELECT id FROM doctors WHERE id = ? AND hospital_id = ?", (doctor_id, hospital_id), one=True)
+        
+        if not doctor:
+            return jsonify({'success': False, 'error': 'Doctor not found or not authorized'}), 404
+        
+        # Delete the doctor
+        query_db("DELETE FROM doctors WHERE id = ?", (doctor_id,), commit=True)
+        
+        return jsonify({'success': True, 'message': 'Doctor deleted successfully'})
+        
+    except Exception as e:
+        app.logger.error(f"Error deleting doctor: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
-    if has_users or has_departments or has_doctors or has_appointments:
-        flash("Cannot delete hospital with associated users, departments, doctors, or appointments.", "danger")
-    else:
-        query_db("DELETE FROM hospitals WHERE id = ?", (hospital_id,), commit=True)
-        flash("Hospital deleted successfully.", "success")
-    return redirect(url_for('super_admin'))
+@app.route('/close_appointment/<int:appt_id>', methods=['POST'])
+@login_required(['hospital_admin'])
+def close_appointment(appt_id):
+    try:
+        # Verify the appointment belongs to the admin's hospital
+        hospital_id = query_db("SELECT hospital_id FROM users WHERE id = ?", (session['user_id'],), one=True)['hospital_id']
+        appointment = query_db(
+            "SELECT id FROM appointments WHERE id = ? AND hospital_id = ?",
+            (appt_id, hospital_id), one=True
+        )
+        
+        if not appointment:
+            flash("Appointment not found or not authorized", "danger")
+            return redirect(url_for('hospital_admin_dashboard'))
+        
+        query_db(
+            "UPDATE appointments SET status = 'closed' WHERE id = ?",
+            (appt_id,), commit=True
+        )
+        
+        flash("Appointment closed successfully", "success")
+    except Exception as e:
+        app.logger.error(f"Error closing appointment: {e}")
+        flash("Error closing appointment", "danger")
+    
+    return redirect(url_for('hospital_admin_dashboard'))
+
+@app.route('/reschedule_appointment', methods=['POST'])
+@login_required(['hospital_admin'])
+def reschedule_appointment():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+
+        appointment_id = data.get('appointment_id')
+        new_date = data.get('date')
+        new_time = data.get('time')
+
+        if not all([appointment_id, new_date, new_time]):
+            return jsonify({'success': False, 'message': 'All fields are required'}), 400
+
+        # Verify the appointment belongs to the admin's hospital
+        hospital_id = query_db("SELECT hospital_id FROM users WHERE id = ?", (session['user_id'],), one=True)['hospital_id']
+        appointment = query_db(
+            "SELECT id, doctor_id FROM appointments WHERE id = ? AND hospital_id = ?",
+            (appointment_id, hospital_id), one=True
+        )
+        
+        if not appointment:
+            return jsonify({'success': False, 'message': 'Appointment not found or not authorized'}), 404
+
+        # Check doctor availability
+        if not is_doctor_available(appointment['doctor_id'], new_date, new_time):
+            return jsonify({'success': False, 'message': 'Selected slot is not available'}), 400
+
+        # Update appointment
+        query_db(
+            "UPDATE appointments SET date = ?, slot_time = ?, status = 'rescheduled' WHERE id = ?",
+            (new_date, new_time, appointment_id), commit=True
+        )
+
+        return jsonify({
+            'success': True,
+            'message': 'Appointment rescheduled successfully'
+        })
+    except Exception as e:
+        app.logger.error(f"Error rescheduling appointment: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500    
 
 @app.route('/reschedule_patient/<int:appt_id>', methods=['POST'])
 @login_required(['patient'])

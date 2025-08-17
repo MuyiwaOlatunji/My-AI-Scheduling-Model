@@ -27,7 +27,7 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        <form method="POST">
+        <form method="POST" id="bookingForm">
             <div class="form-group">
                 <label for="hospital" class="form-label">Hospital</label>
                 <select id="hospital" name="hospital" class="form-select" required>
@@ -65,7 +65,7 @@
                 <label for="health_challenge" class="form-label">Health Challenge</label>
                 <input type="text" id="health_challenge" name="health_challenge" class="form-control" required>
             </div>
-            <button type="submit" id="submitBtn" class="btn btn-primary btn-sm" disabled><i class="fas fa-calendar-check"></i> Book Appointment</button>
+            <button type="submit" id="submitBtn" class="btn btn-primary btn-sm"><i class="fas fa-calendar-check"></i> Book Appointment</button>
         </form>
     </div>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>

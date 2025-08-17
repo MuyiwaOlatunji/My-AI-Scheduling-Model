@@ -63,16 +63,16 @@
                     <h3>Add New Doctor</h3>
                 </div>
                 <div class="card-body">
-                    <form id="addDoctorForm" method="POST" action="{{ url_for('manage_departments') }}">
-                        <input type="hidden" name="dept_id" id="addDoctorDeptId">
+                    <form id="addDoctorForm">
+                        <input type="hidden" name="department_id" id="addDoctorDeptId">
                         <div class="form-row">
                             <div class="form-group col-md-6">
                                 <label for="doctorName" class="form-label">Doctor Name</label>
-                                <input type="text" id="doctorName" name="doctor_name" class="form-control" required>
+                                <input type="text" id="doctorName" name="name" class="form-control" required>
                             </div>
                             <div class="form-group col-md-6">
                                 <label for="doctorGender" class="form-label">Gender</label>
-                                <select id="doctorGender" name="doctor_gender" class="form-select" required>
+                                <select id="doctorGender" name="gender" class="form-select" required>
                                     <option value="M">Male</option>
                                     <option value="F">Female</option>
                                 </select>
@@ -125,7 +125,7 @@
                             </div>
                         </div>
                         <div class="form-group text-right">
-                            <button type="submit" name="add_doctor" class="btn btn-success">
+                            <button type="submit" class="btn btn-success">
                                 <i class="fas fa-save"></i> Save Doctor
                             </button>
                             <button type="button" id="cancelAddDoctorBtn" class="btn btn-danger">
@@ -187,7 +187,7 @@
             <div class="modal-content">
                 <span class="close-modal" id="closeEditDoctorModal">&times;</span>
                 <h3>Edit Doctor</h3>
-                <form id="editDoctorForm" method="POST" action="/update_doctor">
+                <form id="editDoctorForm">
                     <input type="hidden" name="doctor_id" id="editDoctorId">
                     <div class="form-row">
                         <div class="form-group col-md-6">
