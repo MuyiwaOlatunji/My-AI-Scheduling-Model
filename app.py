@@ -767,46 +767,66 @@ def super_admin():
     for h in hospitals:
         print(f"Hospital ID: {h['id']}, Status: {h['subscription_status']}")  # Debug print
     return render_template('super_admin.html', hospitals=hospitals, search=search)
-
 @app.route('/hospital_admin')
 @login_required(['hospital_admin'])
 def hospital_admin_dashboard():
-    hospital_id = query_db("SELECT hospital_id FROM users WHERE id = ?", (session['user_id'],), one=True)['hospital_id']
+    try:
+        # Get hospital_id from the logged-in admin
+        user = query_db("SELECT hospital_id FROM users WHERE id = ?", (session['user_id'],), one=True)
+        if not user or 'hospital_id' not in user:
+            flash("Hospital information not found", "danger")
+            return redirect(url_for('logout'))
+        
+        hospital_id = user['hospital_id']
+        
+        # Get hospital name
+        hospital = query_db("SELECT name FROM hospitals WHERE id = ?", (hospital_id,), one=True)
+        if not hospital:
+            flash("Hospital not found in database", "danger")
+            return redirect(url_for('logout'))
+        
+        hospital_name = hospital['name']
+        
+        search = request.args.get('search', '')
+        search_type = request.args.get('search_type', 'name')
+        
+        query = """
+        SELECT a.id, u.name AS patient_name, u.email, 
+               d.name AS department_name, doc.name AS doctor_name,
+               a.slot_time, a.date, a.no_show_prob, a.reschedule_prob, 
+               a.status, a.doctor_id, doc.schedule AS doctor_schedule
+        FROM appointments a
+        JOIN users u ON a.patient_id = u.id
+        JOIN departments d ON a.department_id = d.id
+        JOIN doctors doc ON a.doctor_id = doc.id
+        WHERE a.hospital_id = ?
+        """
+        args = [hospital_id]
+        
+        if search:
+            if search_type == 'name':
+                query += " AND u.name LIKE ?"
+            elif search_type == 'email':
+                query += " AND u.email LIKE ?"
+            elif search_type == 'department':
+                query += " AND d.name LIKE ?"
+            elif search_type == 'doctor':
+                query += " AND doc.name LIKE ?"
+            elif search_type == 'status':
+                query += " AND a.status LIKE ?"
+            args.append(f"%{search}%")
+        
+        appointments = query_db(query, args)
+        return render_template('hospital_admin.html', 
+                             appointments=appointments, 
+                             search=search, 
+                             search_type=search_type,
+                             hospital_name=hospital_name)
     
-    search = request.args.get('search', '')
-    search_type = request.args.get('search_type', 'name')
-    
-    query = """
-    SELECT a.id, u.name AS patient_name, u.email, 
-           d.name AS department_name, doc.name AS doctor_name,
-           a.slot_time, a.date, a.no_show_prob, a.reschedule_prob, 
-           a.status, a.doctor_id, doc.schedule AS doctor_schedule
-    FROM appointments a
-    JOIN users u ON a.patient_id = u.id
-    JOIN departments d ON a.department_id = d.id
-    JOIN doctors doc ON a.doctor_id = doc.id
-    WHERE a.hospital_id = ?
-    """
-    args = [hospital_id]
-    
-    if search:
-        if search_type == 'name':
-            query += " AND u.name LIKE ?"
-        elif search_type == 'email':
-            query += " AND u.email LIKE ?"
-        elif search_type == 'department':
-            query += " AND d.name LIKE ?"
-        elif search_type == 'doctor':
-            query += " AND doc.name LIKE ?"
-        elif search_type == 'status':
-            query += " AND a.status LIKE ?"
-        args.append(f"%{search}%")
-    
-    appointments = query_db(query, args)
-    return render_template('hospital_admin.html', 
-                         appointments=appointments, 
-                         search=search, 
-                         search_type=search_type)
+    except Exception as e:
+        app.logger.error(f"Error in hospital_admin_dashboard: {str(e)}")
+        flash("An error occurred while loading the dashboard", "danger")
+        return redirect(url_for('logout'))
 
 @app.route('/hospital_register', methods=['GET', 'POST'])
 @login_required(['super_admin'])
@@ -833,57 +853,70 @@ def hospital_register():
 @app.route('/manage_departments', methods=['GET', 'POST'])
 @login_required(['hospital_admin'])
 def manage_departments():
-    hospital_id = query_db("SELECT hospital_id FROM users WHERE id = ?", (session['user_id'],), one=True)['hospital_id']
-    
-    if request.method == 'POST':
-        if 'add_department' in request.form:
-            query_db("INSERT INTO departments (hospital_id, name) VALUES (?, ?)", 
-                     (hospital_id, request.form['name']), commit=True)
-            flash("Department added successfully", "success")
-            return redirect(url_for('manage_departments'))
+    try:
+        # Get hospital_id from the logged-in admin
+        user = query_db("SELECT hospital_id FROM users WHERE id = ?", (session['user_id'],), one=True)
+        if not user or 'hospital_id' not in user:
+            flash("Hospital information not found", "danger")
+            return redirect(url_for('logout'))
         
-        if 'add_doctor' in request.form:
-            # Format the schedule string properly
-            start_day = request.form['start_day'].lower()
-            end_day = request.form['end_day'].lower()
-            start_time = request.form['start_time'].replace(' ', '').lower()
-            end_time = request.form['end_time'].replace(' ', '').lower()
-            
-            schedule = f"{start_day}-{end_day} {start_time}-{end_time}"
-            
-            query_db(
-                "INSERT INTO doctors (hospital_id, department_id, name, gender, schedule) VALUES (?, ?, ?, ?, ?)",
-                (hospital_id, request.form['dept_id'], request.form['doctor_name'], 
-                 request.form['doctor_gender'], schedule),
-                commit=True
-            )
-            flash("Doctor added successfully", "success")
-            return redirect(url_for('manage_departments'))
+        hospital_id = user['hospital_id']
         
-        if 'delete_doctor' in request.form:
-            query_db("DELETE FROM doctors WHERE id = ?", (request.form['doctor_id'],), commit=True)
-            flash("Doctor deleted successfully", "success")
-            return redirect(url_for('manage_departments'))
+        # Get hospital name
+        hospital = query_db("SELECT name FROM hospitals WHERE id = ?", (hospital_id,), one=True)
+        if not hospital:
+            flash("Hospital not found in database", "danger")
+            return redirect(url_for('logout'))
+        
+        hospital_name = hospital['name']
+        
+        if request.method == 'POST':
+            if 'add_department' in request.form:
+                query_db("INSERT INTO departments (hospital_id, name) VALUES (?, ?)", 
+                         (hospital_id, request.form['name']), commit=True)
+                flash("Department added successfully", "success")
+                return redirect(url_for('manage_departments'))
+            
+            if 'add_doctor' in request.form:
+                # Format the schedule string properly
+                start_day = request.form['start_day'].lower()
+                end_day = request.form['end_day'].lower()
+                start_time = request.form['start_time'].replace(' ', '').lower()
+                end_time = request.form['end_time'].replace(' ', '').lower()
+                
+                schedule = f"{start_day}-{end_day} {start_time}-{end_time}"
+                
+                query_db(
+                    "INSERT INTO doctors (hospital_id, department_id, name, gender, schedule) VALUES (?, ?, ?, ?, ?)",
+                    (hospital_id, request.form['dept_id'], request.form['doctor_name'], 
+                     request.form['doctor_gender'], schedule),
+                    commit=True
+                )
+                flash("Doctor added successfully", "success")
+                return redirect(url_for('manage_departments'))
+            
+            if 'delete_doctor' in request.form:
+                query_db("DELETE FROM doctors WHERE id = ?", (request.form['doctor_id'],), commit=True)
+                flash("Doctor deleted successfully", "success")
+                return redirect(url_for('manage_departments'))
+        
+        # Get all departments with their doctors
+        departments = query_db("""
+            SELECT d.id, d.name, 
+                   (SELECT COUNT(*) FROM doctors WHERE department_id = d.id) AS doctor_count
+            FROM departments d 
+            WHERE d.hospital_id = ?
+            ORDER BY d.name
+        """, (hospital_id,))
+        
+        return render_template('manage_departments.html', 
+                             departments=departments,
+                             hospital_name=hospital_name)
     
-    # Get all departments with their doctors
-    departments = query_db("""
-        SELECT d.id, d.name, 
-               (SELECT COUNT(*) FROM doctors WHERE department_id = d.id) AS doctor_count
-        FROM departments d 
-        WHERE d.hospital_id = ?
-        ORDER BY d.name
-    """, (hospital_id,))
-    
-    # Get all doctors for each department
-    for dept in departments:
-        dept['doctors'] = query_db("""
-            SELECT id, name, gender, schedule 
-            FROM doctors 
-            WHERE department_id = ?
-            ORDER BY name
-        """, (dept['id'],))
-    
-    return render_template('manage_departments.html', departments=departments)
+    except Exception as e:
+        app.logger.error(f"Error in manage_departments: {str(e)}")
+        flash("An error occurred while managing departments", "danger")
+        return redirect(url_for('hospital_admin_dashboard'))
 
 @app.route('/add_doctor', methods=['POST'])
 @login_required(['hospital_admin'])

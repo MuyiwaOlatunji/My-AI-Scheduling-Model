@@ -18,7 +18,11 @@
         </div>
     </nav>
     <div class="container">
-        <h1>Hospital Admin Dashboard</h1>
+        <div class="hospital-header">
+            <h1>{{ hospital_name }}</h1>
+            <p class="hospital-subtitle">Administration Dashboard</p>
+        </div>
+        
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}

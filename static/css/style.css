@@ -913,3 +913,22 @@ p a:hover {
     background-color: #f8f9fa;
     border-radius: 4px;
 }
+/* Hospital header styling */
+.hospital-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #eee;
+}
+
+.hospital-header h1 {
+    color: #2c3e50;
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.hospital-subtitle {
+    color: #7f8c8d;
+    font-size: 1.1rem;
+    font-weight: 400;
+    margin: 0;
+}
