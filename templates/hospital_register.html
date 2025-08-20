@@ -3,13 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Register Hospital</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <nav class="navbar">
-        <div class="container">
-            <div class="navbar-brand">Patient Appointment System</div>
+        <div class="navbar-container">
+            <a href="{{ url_for('super_admin') }}" class="navbar-brand">Patient Appointment System</a>
+            <button class="navbar-toggle" aria-label="Toggle navigation">
+                <i class="fas fa-bars"></i>
+            </button>
             <div class="navbar-links">
                 <a href="{{ url_for('super_admin') }}" class="nav-link">Back to Dashboard</a>
                 <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
@@ -25,29 +30,56 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        <form method="POST">
+        <form method="POST" action="{{ url_for('hospital_register') }}">
+            {{ form.hidden_tag() }}
             <div class="form-group">
                 <label for="hospital_name" class="form-label">Hospital Name</label>
-                <input type="text" id="hospital_name" name="hospital_name" class="form-control" required>
+                {{ form.hospital_name(class="form-control") }}
+                {% if form.hospital_name.errors %}
+                    {% for error in form.hospital_name.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
             <div class="form-group">
                 <label for="location" class="form-label">Location</label>
-                <input type="text" id="location" name="location" class="form-control" required>
+                {{ form.location(class="form-control") }}
+                {% if form.location.errors %}
+                    {% for error in form.location.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
             <div class="form-group">
                 <label for="admin_name" class="form-label">Admin Name</label>
-                <input type="text" id="admin_name" name="admin_name" class="form-control" required>
+                {{ form.admin_name(class="form-control") }}
+                {% if form.admin_name.errors %}
+                    {% for error in form.admin_name.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
             <div class="form-group">
                 <label for="admin_email" class="form-label">Admin Email</label>
-                <input type="email" id="admin_email" name="admin_email" class="form-control" required>
+                {{ form.admin_email(class="form-control") }}
+                {% if form.admin_email.errors %}
+                    {% for error in form.admin_email.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
             <div class="form-group">
                 <label for="admin_password" class="form-label">Admin Password</label>
-                <input type="password" id="admin_password" name="admin_password" class="form-control" required>
+                {{ form.admin_password(class="form-control") }}
+                {% if form.admin_password.errors %}
+                    {% for error in form.admin_password.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
-            <button type="submit" class="btn btn-primary">Register Hospital</button>
+            {{ form.submit(class="btn btn-primary") }}
         </form>
     </div>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>

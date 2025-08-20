@@ -1,8 +1,8 @@
 /* General Reset and Base Styles */
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
 body {
@@ -31,33 +31,67 @@ p { margin-bottom: 1rem; font-size: 1rem; }
 /* Navigation Bar */
 .navbar {
     background: #FFFFFF;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    padding: 1rem 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    padding: 1rem 1.5rem;
     border-bottom: 1px solid #EDE9FE;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.navbar-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 .navbar-brand {
     font-size: 1.5rem;
     font-weight: 700;
     color: #7C3AED;
-    transition: color 0.3s ease;
+    text-decoration: none;
+    transition: color 0.2s ease;
 }
 .navbar-brand:hover {
     color: #A78BFA;
+}
+.navbar-links {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
 }
 .navbar-links a.nav-link {
     color: #4B5563;
     font-weight: 500;
     font-size: 0.9rem;
-    margin-left: 1.25rem;
     text-decoration: none;
-    transition: color 0.3s ease;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
 }
 .navbar-links a.nav-link:hover {
     color: #7C3AED;
+    background-color: #EDE9FE;
 }
 .navbar-links a.nav-link.active {
     color: #7C3AED;
-    border-bottom: 2px solid #7C3AED;
+    background-color: #EDE9FE;
+    font-weight: 600;
+}
+.navbar-toggle {
+    display: none;
+    font-size: 1.5rem;
+    background: none;
+    border: none;
+    color: #4B5563;
+    cursor: pointer;
+}
+.navbar-toggle:hover {
+    color: #7C3AED;
 }
 
 /* Container */
@@ -210,7 +244,7 @@ p { margin-bottom: 1rem; font-size: 1rem; }
     width: auto;
     padding: 15px 20px;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     opacity: 0;
     transform: translateX(100%);
     transition: all 0.3s ease;
@@ -218,41 +252,34 @@ p { margin-bottom: 1rem; font-size: 1rem; }
     align-items: center;
     justify-content: space-between;
 }
-
 .alert.show {
     opacity: 1;
     transform: translateX(0);
 }
-
 .alert.hide {
     opacity: 0;
     transform: translateX(100%);
 }
-
 .alert-success {
     background-color: #D1FAE5;
     color: #065F46;
     border-left: 4px solid #34D399;
 }
-
 .alert-danger {
     background-color: #FEE2E2;
     color: #991B1B;
     border-left: 4px solid #EF4444;
 }
-
 .alert-info {
     background-color: #DBEAFE;
     color: #1E40AF;
     border-left: 4px solid #3B82F6;
 }
-
 .alert-warning {
     background-color: #FEF3C7;
     color: #92400E;
     border-left: 4px solid #F59E0B;
 }
-
 .alert-close {
     background: none;
     border: none;
@@ -263,7 +290,6 @@ p { margin-bottom: 1rem; font-size: 1rem; }
     opacity: 0.7;
     transition: opacity 0.2s;
 }
-
 .alert-close:hover {
     opacity: 1;
 }
@@ -361,14 +387,54 @@ p a:hover {
     margin-bottom: 1.5rem;
     display: flex;
     gap: 0.5rem;
+    align-items: center;
 }
 .search-container .form-control {
     display: inline-block;
     width: 250px;
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+    border-radius: 6px;
 }
 .search-container .form-select {
     display: inline-block;
     width: 150px;
+    padding: 0.6rem;
+    font-size: 0.9rem;
+}
+.search-results {
+    background: #FFFFFF;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid #E5E7EB;
+}
+.search-result-item {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #E5E7EB;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: #2D3748;
+    transition: background-color 0.2s ease;
+}
+.search-result-item:hover {
+    background-color: #EDE9FE;
+}
+.search-result-item:last-child {
+    border-bottom: none;
+}
+.search-result-item div {
+    flex: 1;
+}
+.search-result-item .btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
 }
 
 /* Toggleable Profile Form */
@@ -419,16 +485,31 @@ p a:hover {
     h2 { font-size: 1.5rem; }
     h3 { font-size: 1.125rem; }
     .navbar {
+        padding: 1rem;
+    }
+    .navbar-container {
         flex-direction: column;
         align-items: flex-start;
     }
     .navbar-links {
+        display: none;
+        flex-direction: column;
+        width: 100%;
+        gap: 0.5rem;
         margin-top: 1rem;
     }
+    .navbar-links.active {
+        display: flex;
+    }
     .navbar-links a.nav-link {
-        margin-left: 0;
-        padding: 0.5rem 0;
+        padding: 0.5rem;
         font-size: 0.85rem;
+    }
+    .navbar-toggle {
+        display: block;
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
     }
     .btn {
         padding: 0.4rem 0.8rem;
@@ -455,9 +536,6 @@ p a:hover {
         padding: 0.5rem;
     }
     .form-container {
-        background-color: #FFFFFF;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         padding: 1.5rem;
     }
     .search-container .form-control {
@@ -475,8 +553,12 @@ p a:hover {
         right: 20px;
         left: 20px;
     }
+    .search-results {
+        max-height: 200px;
+    }
 }
 
+/* Disabled Button */
 .disabled-btn {
     opacity: 0.6;
     cursor: not-allowed;
@@ -491,18 +573,15 @@ p a:hover {
     border-radius: 12px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
 }
-
 .login-header {
     text-align: center;
     margin-bottom: 2rem;
 }
-
 .login-header h1 {
     color: #7C3AED;
     font-size: 2rem;
     margin-bottom: 0.5rem;
 }
-
 .login-header p {
     color: #6B7280;
     font-size: 0.95rem;
@@ -512,7 +591,6 @@ p a:hover {
 .login-form {
     margin-top: 1.5rem;
 }
-
 .login-form .form-label {
     display: flex;
     align-items: center;
@@ -521,12 +599,10 @@ p a:hover {
     font-size: 0.9rem;
     margin-bottom: 0.5rem;
 }
-
 .login-form .form-label i {
     color: #7C3AED;
     font-size: 0.9rem;
 }
-
 .login-form .form-control {
     padding: 0.75rem 1rem;
     border-radius: 8px;
@@ -534,12 +610,10 @@ p a:hover {
     font-size: 0.95rem;
     transition: all 0.2s ease;
 }
-
 .login-form .form-control:focus {
     border-color: #7C3AED;
     box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
 }
-
 .login-form .form-control::placeholder {
     color: #9CA3AF;
 }
@@ -548,7 +622,6 @@ p a:hover {
 .form-footer {
     margin-top: 2rem;
 }
-
 .btn-block {
     display: block;
     width: 100%;
@@ -556,14 +629,12 @@ p a:hover {
     font-size: 1rem;
     border-radius: 8px;
 }
-
 .login-links {
     display: flex;
     justify-content: space-between;
     margin-top: 1.5rem;
     font-size: 0.85rem;
 }
-
 .login-links a {
     color: #6B7280;
     text-decoration: none;
@@ -572,7 +643,6 @@ p a:hover {
     align-items: center;
     gap: 0.3rem;
 }
-
 .login-links a:hover {
     color: #7C3AED;
 }
@@ -583,11 +653,9 @@ p a:hover {
         margin: 2rem auto;
         padding: 1.5rem;
     }
-    
     .login-header h1 {
         font-size: 1.75rem;
     }
-    
     .login-links {
         flex-direction: column;
         gap: 0.5rem;
@@ -603,20 +671,17 @@ p a:hover {
     margin-bottom: 1.5rem;
     border: none;
 }
-
 .card-header {
     padding: 1rem 1.5rem;
     background: #F9FAFB;
     border-bottom: 1px solid #EDE9FE;
-    border-radius: 8px 8px 0 0 !important;
+    border-radius: 8px 8px 0 0;
 }
-
 .card-header h3 {
     margin: 0;
     font-size: 1.25rem;
     color: #7C3AED;
 }
-
 .card-body {
     padding: 1.5rem;
 }
@@ -629,7 +694,6 @@ p a:hover {
     margin-bottom: 1.5rem;
     flex-wrap: wrap;
 }
-
 .action-buttons {
     display: flex;
     gap: 0.75rem;
@@ -642,7 +706,6 @@ p a:hover {
     margin-right: -0.75rem;
     margin-left: -0.75rem;
 }
-
 .form-row .form-group {
     padding-right: 0.75rem;
     padding-left: 0.75rem;
@@ -659,7 +722,6 @@ p a:hover {
     height: 100%;
     background-color: rgba(0, 0, 0, 0.4);
 }
-
 .modal-content {
     background-color: #FFFFFF;
     margin: 10% auto;
@@ -670,7 +732,6 @@ p a:hover {
     max-width: 500px;
     position: relative;
 }
-
 .close-modal {
     position: absolute;
     right: 1.5rem;
@@ -680,7 +741,6 @@ p a:hover {
     color: #6B7280;
     cursor: pointer;
 }
-
 .close-modal:hover {
     color: #7C3AED;
 }
@@ -696,7 +756,6 @@ p a:hover {
 .text-right {
     text-align: right;
 }
-
 .text-center {
     text-align: center;
 }
@@ -719,18 +778,15 @@ p a:hover {
         align-items: flex-start;
         gap: 1rem;
     }
-    
     .action-buttons {
         width: 100%;
         justify-content: flex-end;
     }
-    
     .form-row .form-group {
         flex: 0 0 100%;
         max-width: 100%;
         margin-bottom: 1rem;
     }
-    
     .modal-content {
         margin: 20% auto;
         width: 90%;
@@ -750,28 +806,24 @@ p a:hover {
     justify-content: center;
     align-items: center;
 }
-
 .confirm-dialog .confirm-content {
-    background: white;
+    background: #FFFFFF;
     padding: 20px;
     border-radius: 8px;
     max-width: 400px;
     width: 90%;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
-
 .confirm-dialog p {
     margin-bottom: 20px;
     font-size: 16px;
     color: #2D3748;
 }
-
 .confirm-buttons {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
 }
-
 .confirm-buttons button {
     padding: 8px 16px;
     border-radius: 6px;
@@ -780,154 +832,107 @@ p a:hover {
     border: none;
     transition: all 0.2s ease;
 }
-
 .confirm-buttons .confirm-yes {
     background-color: #7C3AED;
-    color: white;
+    color: #FFFFFF;
 }
-
 .confirm-buttons .confirm-yes:hover {
     background-color: #6D28D9;
 }
-
 .confirm-buttons .confirm-no {
     background-color: #E5E7EB;
     color: #4B5563;
 }
-
 .confirm-buttons .confirm-no:hover {
     background-color: #D1D5DB;
 }
-/* Status badges */
+
+/* Status Badges */
 .status-badge {
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 0.85rem;
     font-weight: 500;
 }
-
 .status-scheduled {
-    background-color: #fff3cd;
+    background-color: #FFF3CD;
     color: #856404;
 }
-
 .status-rescheduled {
-    background-color: #cce5ff;
+    background-color: #CCE5FF;
     color: #004085;
 }
-
 .status-attended {
-    background-color: #d4edda;
+    background-color: #D4EDDA;
     color: #155724;
 }
-
 .status-no_show {
-    background-color: #f8d7da;
-    color: #721c24;
+    background-color: #F8D7DA;
+    color: #721C24;
 }
-
 .status-closed {
-    background-color: #e2e3e5;
-    color: #383d41;
+    background-color: #E2E3E5;
+    color: #383D41;
 }
 
-/* Risk indicators */
+/* Risk Indicators */
 .high-risk {
-    color: #dc3545;
+    color: #DC3545;
     font-weight: bold;
 }
-
 .low-risk {
-    color: #28a745;
+    color: #28A745;
 }
 
-/* Modal styles */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.5);
-}
-
-.modal-content {
-    background-color: #fff;
-    margin: 10% auto;
-    padding: 20px;
-    border-radius: 5px;
-    width: 50%;
-    max-width: 600px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.close-modal {
-    color: #aaa;
-    float: right;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-.close-modal:hover {
-    color: #000;
-}
-
-/* Availability status */
+/* Availability Status */
 .availability-status {
     margin-top: 5px;
     padding: 5px;
     border-radius: 4px;
 }
-
 .availability-status.available {
-    background-color: #d4edda;
+    background-color: #D4EDDA;
     color: #155724;
 }
-
 .availability-status.unavailable {
-    background-color: #f8d7da;
-    color: #721c24;
+    background-color: #F8D7DA;
+    color: #721C24;
 }
-
 .availability-status.error {
-    background-color: #fff3cd;
+    background-color: #FFF3CD;
     color: #856404;
 }
 
-/* Action buttons */
+/* Doctor Schedule Info */
+.doctor-schedule-info {
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #F8F9FA;
+    border-radius: 4px;
+}
+
+/* Action Buttons */
 .action-buttons {
     display: flex;
     gap: 5px;
 }
-
 .action-buttons button {
     padding: 5px 10px;
 }
 
-.doctor-schedule-info {
-    margin-bottom: 15px;
-    padding: 10px;
-    background-color: #f8f9fa;
-    border-radius: 4px;
-}
-/* Hospital header styling */
+/* Hospital Header Styling */
 .hospital-header {
     margin-bottom: 2rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid #EEE;
 }
-
 .hospital-header h1 {
-    color: #2c3e50;
+    color: #2C3E50;
     font-size: 2rem;
     margin-bottom: 0.5rem;
 }
-
 .hospital-subtitle {
-    color: #7f8c8d;
+    color: #7F8C8D;
     font-size: 1.1rem;
     font-weight: 400;
     margin: 0;

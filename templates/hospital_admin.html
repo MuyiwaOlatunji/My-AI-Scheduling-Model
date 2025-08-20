@@ -3,14 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Hospital Admin Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <nav class="navbar">
-        <div class="container">
-            <div class="navbar-brand">Patient Appointment System</div>
+        <div class="navbar-container">
+            <a href="{{ url_for('hospital_admin_dashboard') }}" class="navbar-brand">Patient Appointment System</a>
+            <button class="navbar-toggle" aria-label="Toggle navigation">
+                <i class="fas fa-bars"></i>
+            </button>
             <div class="navbar-links">
                 <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
             </div>
@@ -97,6 +101,7 @@
                                 <div class="action-buttons">
                                     {% if appt.status == 'scheduled' %}
                                         <form action="{{ url_for('mark_attended', appt_id=appt.id) }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="btn btn-sm btn-success" title="Mark as Attended">
                                                 <i class="fas fa-check"></i>
                                             </button>
@@ -117,12 +122,14 @@
                                             <i class="fas fa-calendar-alt"></i>
                                         </button>
                                         <form action="{{ url_for('close_appointment', appt_id=appt.id) }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="btn btn-sm btn-danger" title="Close Appointment">
                                                 <i class="fas fa-times"></i>
                                             </button>
                                         </form>
                                     {% elif appt.status == 'rescheduled' %}
                                         <form action="{{ url_for('mark_attended', appt_id=appt.id) }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="btn btn-sm btn-success" title="Mark as Attended">
                                                 <i class="fas fa-check"></i>
                                             </button>
@@ -152,7 +159,8 @@
             <div class="doctor-schedule-info">
                 <p><strong>Doctor's Schedule:</strong> <span id="doctorScheduleDisplay"></span></p>
             </div>
-            <form id="rescheduleForm">
+            <form id="rescheduleForm" data-is-hospital-admin="true">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" id="appointmentId" name="appointment_id">
                 <input type="hidden" id="doctorId" name="doctor_id">
                 
@@ -173,10 +181,13 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-calendar-check"></i> Reschedule
                     </button>
+                    <button type="button" id="cancelRescheduleBtn" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
                 </div>
             </form>
         </div>
     </div>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-    </body>
+</body>
 </html>

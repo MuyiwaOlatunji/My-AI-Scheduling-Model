@@ -3,13 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Super Admin Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <nav class="navbar">
-        <div class="container">
-            <div class="navbar-brand">Patient Appointment System</div>
+        <div class="navbar-container">
+            <a href="{{ url_for('super_admin') }}" class="navbar-brand">Patient Appointment System</a>
+            <button class="navbar-toggle" aria-label="Toggle navigation">
+                <i class="fas fa-bars"></i>
+            </button>
             <div class="navbar-links">
                 <a href="{{ url_for('hospital_register') }}" class="nav-link">Register Hospital</a>
                 <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
@@ -53,21 +58,47 @@
                         <td>
                             {% if hospital.subscription_status == 'suspended' %}
                                 <form action="{{ url_for('activate_hospital', hospital_id=hospital.id) }}" method="POST" style="display:inline;">
-                                    <button type="submit" class="btn btn-success btn-sm">Activate</button>
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-success btn-sm">
+                                        <i class="fas fa-play"></i> Activate
+                                    </button>
                                 </form>
                             {% elif hospital.subscription_status == 'active' %}
                                 <form action="{{ url_for('suspend_hospital', hospital_id=hospital.id) }}" method="POST" style="display:inline;">
-                                    <button type="submit" class="btn btn-warning btn-sm">Suspend</button>
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-warning btn-sm">
+                                        <i class="fas fa-pause"></i> Suspend
+                                    </button>
                                 </form>
                             {% endif %}
-                            <form action="{{ url_for('delete_hospital', hospital_id=hospital.id) }}" method="POST" style="display:inline;">
-                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this hospital? This action cannot be undone.')">Delete</button>
-                            </form>
+                            <button class="btn btn-danger btn-sm delete-hospital-btn" 
+                                    data-hospital-id="{{ hospital.id }}"
+                                    style="margin-left: 5px;">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
                         </td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteHospitalModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h3>Confirm Deletion</h3>
+            <p>Are you sure you want to permanently delete this hospital? This action cannot be undone.</p>
+            <form id="deleteHospitalForm" method="POST" action="{{ url_for('delete_hospital', hospital_id=0) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            </form>
+            <div class="modal-actions">
+                <button id="confirmDeleteBtn" class="btn btn-danger">Delete</button>
+                <button id="cancelDeleteBtn" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>

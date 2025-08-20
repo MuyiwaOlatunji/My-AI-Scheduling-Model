@@ -3,14 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Patient Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <nav class="navbar">
-        <div class="container">
-            <div class="navbar-brand">Patient Appointment System</div>
+        <div class="navbar-container">
+            <a href="{{ url_for('patient_dashboard') }}" class="navbar-brand">Patient Appointment System</a>
+            <button class="navbar-toggle" aria-label="Toggle navigation">
+                <i class="fas fa-bars"></i>
+            </button>
             <div class="navbar-links">
                 <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
             </div>
@@ -31,23 +35,36 @@
         </button>
         
         <div id="profileForm" class="form-container" style="display: none; margin-top: 1rem;">
-            <form method="POST" action="{{ url_for('update_profile') }}">
+            <form method="POST" action="{{ url_for('update_profile') }}" id="updateProfileForm">
+                {{ form.hidden_tag() }}
                 <div class="form-group">
                     <label for="occupation" class="form-label">Occupation</label>
-                    <input type="text" id="occupation" name="occupation" class="form-control" 
-                        value="{{ user.occupation if user.occupation else '' }}" required>
+                    {{ form.occupation(class="form-control", value=user.occupation if user.occupation else '') }}
+                    {% if form.occupation.errors %}
+                        {% for error in form.occupation.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    {% endif %}
                 </div>
                 <div class="form-group">
                     <label for="location" class="form-label">Location</label>
-                    <input type="text" id="location" name="location" class="form-control" 
-                        value="{{ user.location if user.location else '' }}" required>
+                    {{ form.location(class="form-control", value=user.location if user.location else '') }}
+                    {% if form.location.errors %}
+                        {% for error in form.location.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    {% endif %}
                 </div>
                 <div class="form-group">
                     <label for="age" class="form-label">Age</label>
-                    <input type="number" id="age" name="age" class="form-control" 
-                        value="{{ user.age if user.age else '' }}" required>
+                    {{ form.age(class="form-control", value=user.age if user.age else '') }}
+                    {% if form.age.errors %}
+                        {% for error in form.age.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    {% endif %}
                 </div>
-                <button type="submit" class="btn btn-primary">Save Profile</button>
+                {{ form.submit(class="btn btn-primary") }}
             </form>
         </div>
         
@@ -68,41 +85,93 @@
             <a href="{{ url_for('patient_dashboard', sort_by='status', sort_order='desc') }}" class="{% if request.args.get('sort_by') == 'status' and request.args.get('sort_order') == 'desc' %}active{% endif %}">Status (Desc)</a>
         </p>
         
-        <table class="table table-striped table-hover">
-            <thead>
-                <tr>
-                    <th>Hospital</th>
-                    <th>Department</th>
-                    <th>Doctor</th>
-                    <th>Date</th>
-                    <th>Time</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for appt in appointments %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
                     <tr>
-                        <td>{{ appt.hospital }}</td>
-                        <td>{{ appt.department }}</td>
-                        <td>{{ appt.doctor }}</td>
-                        <td>{{ appt.date }}</td>
-                        <td>{{ appt.slot_time }}</td>
-                        <td>{{ appt.status }}</td>
-                        <td>
-                            {% if appt.status not in ['attended', 'closed'] %}
-                                <form action="{{ url_for('reschedule_patient', appt_id=appt.id) }}" method="POST" style="display:inline;">
-                                    <input type="date" name="date" class="form-control d-inline-block" required>
-                                    <input type="text" name="time" class="form-control d-inline-block" placeholder="e.g., 09:00 AM" required>
-                                    <button type="submit" class="btn btn-sm btn-primary">Reschedule</button>
-                                </form>
-                            {% endif %}
-                        </td>
+                        <th>Hospital</th>
+                        <th>Department</th>
+                        <th>Doctor</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                        <th>Actions</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% for appt in appointments %}
+                        <tr>
+                            <td>{{ appt.hospital }}</td>
+                            <td>{{ appt.department }}</td>
+                            <td>{{ appt.doctor }}</td>
+                            <td>{{ appt.date }}</td>
+                            <td>{{ appt.slot_time }}</td>
+                            <td>
+                                <span class="status-badge status-{{ appt.status.lower() }}">
+                                    {{ appt.status }}
+                                </span>
+                            </td>
+                            <td class="actions">
+                                {% if appt.status not in ['attended', 'closed'] %}
+                                    <button class="btn btn-sm btn-warning reschedule-btn" 
+                                            data-appt-id="{{ appt.id }}"
+                                            data-doctor-id="{{ appt.doctor_id }}"
+                                            data-doctor-schedule="{{ appt.doctor_schedule }}"
+                                            title="Reschedule Appointment">
+                                        <i class="fas fa-calendar-alt"></i> Reschedule
+                                    </button>
+                                    <button class="btn btn-sm btn-danger cancel-appointment-btn" 
+                                            data-appt-id="{{ appt.id }}"
+                                            title="Cancel Appointment">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
+
+    <!-- Reschedule Modal -->
+    <div id="rescheduleModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h3>Reschedule Appointment</h3>
+            <div class="doctor-schedule-info">
+                <p><strong>Doctor's Schedule:</strong> <span id="doctorScheduleDisplay"></span></p>
+            </div>
+            <form id="rescheduleForm" data-is-hospital-admin="false">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" id="appointmentId" name="appointment_id">
+                <input type="hidden" id="doctorId" name="doctor_id">
+                
+                <div class="form-group">
+                    <label for="rescheduleDate">New Date</label>
+                    <input type="date" id="rescheduleDate" name="date" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="rescheduleTime">New Time</label>
+                    <select id="rescheduleTime" name="time" class="form-control" required>
+                        <option value="" disabled selected>Select a time</option>
+                    </select>
+                    <div id="timeAvailability" class="availability-status"></div>
+                </div>
+                
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-calendar-check"></i> Reschedule
+                    </button>
+                    <button type="button" id="cancelRescheduleBtn" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>

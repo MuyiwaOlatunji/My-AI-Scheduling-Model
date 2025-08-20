@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Patient Registration</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <nav class="navbar">
@@ -25,53 +27,90 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        <form method="POST">
+        <form method="POST" action="{{ url_for('register') }}">
+            {{ form.hidden_tag() }}
             <div class="form-group">
                 <label for="name" class="form-label">Name</label>
-                <input type="text" id="name" name="name" class="form-control" required>
+                {{ form.name(class="form-control") }}
+                {% if form.name.errors %}
+                    {% for error in form.name.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
             <div class="form-group">
                 <label for="email" class="form-label">Email</label>
-                <input type="email" id="email" name="email" class="form-control" required>
+                {{ form.email(class="form-control") }}
+                {% if form.email.errors %}
+                    {% for error in form.email.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
             <div class="form-group">
                 <label for="phone" class="form-label">Phone</label>
-                <input type="tel" id="phone" name="phone" class="form-control" required>
+                {{ form.phone(class="form-control") }}
+                {% if form.phone.errors %}
+                    {% for error in form.phone.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
             <div class="form-group">
                 <label for="password" class="form-label">Password</label>
-                <input type="password" id="password" name="password" class="form-control" required>
+                {{ form.password(class="form-control") }}
+                {% if form.password.errors %}
+                    {% for error in form.password.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
             <div class="form-group">
                 <label for="age" class="form-label">Age</label>
-                <input type="number" id="age" name="age" class="form-control" required>
+                {{ form.age(class="form-control") }}
+                {% if form.age.errors %}
+                    {% for error in form.age.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
             <div class="form-group">
                 <label for="location" class="form-label">Location</label>
-                <input type="text" id="location" name="location" class="form-control" required>
+                {{ form.location(class="form-control") }}
+                {% if form.location.errors %}
+                    {% for error in form.location.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
             <div class="form-group">
                 <label for="gender" class="form-label">Gender</label>
-                <select id="gender" name="gender" class="form-select" required>
-                    <option value="M">Male</option>
-                    <option value="F">Female</option>
-                    <option value="Other">Other</option>
-                </select>
+                {{ form.gender(class="form-select") }}
+                {% if form.gender.errors %}
+                    {% for error in form.gender.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
             <div class="form-group">
                 <label for="marriage_status" class="form-label">Marital Status</label>
-                <select id="marriage_status" name="marriage_status" class="form-select" required>
-                    <option value="Single">Single</option>
-                    <option value="Married">Married</option>
-                    <option value="Divorced">Divorced</option>
-                    <option value="Widowed">Widowed</option>
-                </select>
+                {{ form.marriage_status(class="form-select") }}
+                {% if form.marriage_status.errors %}
+                    {% for error in form.marriage_status.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
             <div class="form-group">
                 <label for="occupation" class="form-label">Occupation</label>
-                <input type="text" id="occupation" name="occupation" class="form-control" required>
+                {{ form.occupation(class="form-control") }}
+                {% if form.occupation.errors %}
+                    {% for error in form.occupation.errors %}
+                        <span class="text-danger">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
             </div>
-            <button type="submit" class="btn btn-primary">Register</button>
+            {{ form.submit(class="btn btn-primary") }}
         </form>
     </div>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
